@@ -113,6 +113,12 @@
               </svg>
             </button>
             <input type="text" disabled id="textInputFolder" value="" required />
+            <button class="browse-folder" type="button" data-tooltip="Vista Previa" data-flow="left"
+              id="btnPreviewModal" style="display:none;" onclick="openPreviewModal(event)">
+              <svg fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+              </svg>
+            </button>
             <button class="browse-folder" tabindex="3" data-tooltip="Browse Folder" data-flow="left"
               id="textBrowseFolder" onclick="selectFolder(event)">
               <svg fill="currentColor" viewBox="0 0 24 24">
@@ -125,7 +131,6 @@
               <p id="requiredMsgDir">required</p>
             </div>
           </div>
-          <div id="gridPreview" style="display:none; flex-wrap:wrap; gap:4px; max-height:70px; overflow-y:auto; padding:4px; background:rgba(0,0,0,0.1); border-radius:6px; margin-top:4px;"></div>
         </div>
         <div class="for-required">
           <div class="icon" data-tooltip="Select Icon" data-flow="bottom" id="textSelectIcon">
@@ -330,6 +335,15 @@
             <p id="textSuccessCreate">Pack created successfully</p>
             <button id="textSuccessAccept" onclick="finish(event)">Accept</button>
           </div>
+        </div>
+      </div>
+      <div class="preview-modal" id="previewModal">
+        <div class="back" onclick="statePreviewModal(false)"></div>
+        <div class="card">
+          <h2 style="font-size:0.85rem; color:var(--color-text); margin:0; font-weight:bold;">Vista Previa de Stickers</h2>
+          <p style="font-size:0.65rem; color:var(--color-text); opacity:0.8; margin:0; text-align:center;">Toca una imagen para incluirla/excluirla del paquete</p>
+          <div class="grid-container" id="gridPreviewThumbnails"></div>
+          <button class="main-button" type="button" style="width:80%; padding:0.4rem; font-size:0.75rem;" onclick="statePreviewModal(false)">Aceptar</button>
         </div>
       </div>
     </main>

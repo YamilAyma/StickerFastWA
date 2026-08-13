@@ -68,9 +68,24 @@ class Api:
         if not folder or not os.path.isdir(folder):
             return []
         try:
+            from PIL import Image
+            import io
+            import base64
             files = sfwa.files_in_dir(folder)
-            valid_imgs = [f for f in files if sfwa.validate_img(f) or sfwa.validate_gif(f)]
-            return valid_imgs[:30]
+            valid_imgs = [f for f in files if sfwa.validate_img(f) or sfwa.validate_gif(f)][:30]
+            result = []
+            for f in valid_imgs:
+                full_path = os.path.join(folder, f)
+                try:
+                    with Image.open(full_path) as img:
+                        img.thumbnail((96, 96))
+                        buf = io.BytesIO()
+                        img.save(buf, format="PNG")
+                        b64 = base64.b64encode(buf.getvalue()).decode()
+                        result.append({"name": f, "encode": b64})
+                except Exception as err:
+                    print(f"Error encoding thumbnail for {f}: {err}")
+            return result
         except Exception as e:
             print(f"Error getting folder images: {e}")
             return []

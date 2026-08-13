@@ -258,6 +258,7 @@ function openFolder(e) {
     }
 }
 
+let folderImages = [];
 let ignoredFiles = [];
 
 function selectFolder(e) {
@@ -272,33 +273,70 @@ function selectFolder(e) {
 
 function loadFolderPreview(folderPath) {
     ignoredFiles = [];
-    const grid = document.getElementById('gridPreview');
-    if (!grid) return;
-    grid.innerHTML = '';
+    folderImages = [];
+    const btnPreview = document.getElementById('btnPreviewModal');
     pywebview.api.getFolderImages(folderPath).then((imgs) => {
         if (imgs && imgs.length > 0) {
-            grid.style.display = 'flex';
-            imgs.forEach((file) => {
-                const tag = document.createElement('span');
-                tag.style.cssText = "font-size:10px; padding:2px 6px; background:#27c900; color:#fff; border-radius:4px; cursor:pointer; user-select:none;";
-                tag.textContent = file;
-                tag.title = "Clic para incluir/excluir";
-                tag.onclick = () => {
-                    if (ignoredFiles.includes(file)) {
-                        ignoredFiles = ignoredFiles.filter(f => f !== file);
-                        tag.style.background = "#27c900";
-                        tag.style.textDecoration = "none";
-                    } else {
-                        ignoredFiles.push(file);
-                        tag.style.background = "#e43131";
-                        tag.style.textDecoration = "line-through";
-                    }
-                };
-                grid.appendChild(tag);
-            });
+            folderImages = imgs;
+            if (btnPreview) btnPreview.style.display = 'flex';
         } else {
-            grid.style.display = 'none';
+            if (btnPreview) btnPreview.style.display = 'none';
         }
+    });
+}
+
+function openPreviewModal(e) {
+    if (e) e.preventDefault();
+    renderPreviewThumbnails();
+    statePreviewModal(true);
+}
+
+function statePreviewModal(state) {
+    let modal = document.getElementById('previewModal');
+    let form = document.getElementById('form');
+    if (state) {
+        form.style.filter = "blur(1px)";
+        modal.style.display = "flex";
+    } else {
+        form.style.filter = "none";
+        modal.style.display = "none";
+    }
+}
+
+function renderPreviewThumbnails() {
+    const grid = document.getElementById('gridPreviewThumbnails');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    folderImages.forEach((item) => {
+        const div = document.createElement('div');
+        const isExcluded = ignoredFiles.includes(item.name);
+        div.className = `item ${isExcluded ? 'excluded' : ''}`;
+
+        const img = document.createElement('img');
+        img.src = `data:image/png;base64,${item.encode}`;
+        img.alt = item.name;
+
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = isExcluded ? '✕' : '✓';
+
+        div.appendChild(img);
+        div.appendChild(badge);
+
+        div.onclick = () => {
+            if (ignoredFiles.includes(item.name)) {
+                ignoredFiles = ignoredFiles.filter(f => f !== item.name);
+                div.classList.remove('excluded');
+                badge.textContent = '✓';
+            } else {
+                ignoredFiles.push(item.name);
+                div.classList.add('excluded');
+                badge.textContent = '✕';
+            }
+        };
+
+        grid.appendChild(div);
     });
 }
 
