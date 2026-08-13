@@ -24,6 +24,10 @@ class Sfwa:
     def __init__(self):
         global root
         root = os.getcwd()
+        self.cancel_flag = False
+
+    def cancel_processing(self):
+        self.cancel_flag = True
 
     # ~ GET the user preferences for the GUI
     def get_user_preferences(self):
@@ -66,12 +70,14 @@ class Sfwa:
 
     # ~ GET the language json file
     def get_language_json(self, lang):
-        # get the directory of the language in base lang param
+        if not lang or not isinstance(lang, str):
+            lang = "es"
         file = os.path.join(root, "src", "lang", f"{lang}.json")
-        # open in read mode the file
-        with open(file, "r") as read_file:
-            response = json.load(read_file)  # load the response
-        return response  # return the response
+        if not os.path.exists(file):
+            file = os.path.join(root, "src", "lang", "es.json")
+        with open(file, "r", encoding="utf-8") as read_file:
+            response = json.load(read_file)
+        return response
 
     # ~ return the default directory of the pictures
     def get_default_dir(self):
@@ -141,16 +147,17 @@ class Sfwa:
         return DefaultMunch.fromDict(data)  # return the data serialized
 
     # ~ Create a pack with the data passed
-    def create_pack(self, data):
-        # serialize the data
+    def create_pack(self, data, progress_callback=None):
+        self.cancel_flag = False
         data = self.serialize_data(data)
         response = False  # response default is false
+        ignored_files = getattr(data, 'ignored_files', None)
         try:
             # evaluate the data app select for the user and call the function to create compatible the pack with that app
             if data.package == "stickerMaker":
-                response = self.create_pack_sticker_maker(data)
+                response = self.create_pack_sticker_maker(data, progress_callback=progress_callback, ignored_files=ignored_files)
             else:
-                response = self.create_pack_wemoji(data)
+                response = self.create_pack_wemoji(data, progress_callback=progress_callback, ignored_files=ignored_files)
         except Exception as e:
             print(f"Error creating pack: {e}")
             response = False
@@ -159,7 +166,7 @@ class Sfwa:
         return response  # return the response
 
     # ~ Create the pack for the wemoji app
-    def create_pack_wemoji(self, data):
+    def create_pack_wemoji(self, data, progress_callback=None, ignored_files=None):
         # copy the compresed file to the directory of the user
         dir_origin = os.path.join(root, "src", "resources", "compressed")
         zip_file_name = "wemoji.wemojipack"
@@ -202,7 +209,7 @@ class Sfwa:
         img_icon.save(icon_name)
         img_icon.close()
         # process the lote of images
-        self.process_images(data.directory, folder_name, data.animated, data.conserve)
+        self.process_images(data.directory, folder_name, data.animated, data.conserve, progress_callback=progress_callback, ignored_files=ignored_files)
         os.chdir(data.directory)
         # add the folder with all files in the zip file
         self.add_folder_to_zip(zip_file_name, folder_name)
@@ -214,7 +221,7 @@ class Sfwa:
         return True  # return the response
 
     # ~ Create the pack for the sticker maker app
-    def create_pack_sticker_maker(self, data):
+    def create_pack_sticker_maker(self, data, progress_callback=None, ignored_files=None):
         # copy the compresed file to the directory of the user
         dir_origin = os.path.join(root, "src", "resources", "compressed")
         zip_file_name = "stickermaker.wastickers"
@@ -237,7 +244,7 @@ class Sfwa:
         img_icon.save(icon_name)
         img_icon.close()
         # process the lote of images
-        self.process_images(data.directory, folder_name, data.animated, data.conserve)
+        self.process_images(data.directory, folder_name, data.animated, data.conserve, progress_callback=progress_callback, ignored_files=ignored_files)
         os.chdir(data.directory)
         zip_dir = f"{data.directory}/{zip_file_name}"
         folder_dir = f"{data.directory}/{folder_name}"
@@ -277,17 +284,34 @@ class Sfwa:
                 open_file.close()
 
     # ~ process the images in the folder in base params passed
-    def process_images(self, directory, destiny, animated=False, conserve_imgs=True):
+    def process_images(self, directory, destiny, animated=False, conserve_imgs=True, progress_callback=None, ignored_files=None):
         # change to the directory passed
         os.chdir(directory)
         # list the image files in the directory
-        files = self.files_in_dir(directory)
+        all_files = self.files_in_dir(directory)
+        if ignored_files:
+            files = [f for f in all_files if f not in ignored_files]
+        else:
+            files = all_files
+
+        total_files = min(len(files), 30)
         checker = 0  # checker for the number of files in the directory
         file_format = "webp"  # define the final format to the image
+
         # iterate the image files in the directory
         for file in files:
+            if self.cancel_flag:
+                print("Pack creation cancelled by user flag.")
+                break
+
             checker += 1  # increment the checker
-            # check if the the number file is menor than 30
+            if progress_callback:
+                try:
+                    progress_callback(checker, total_files)
+                except Exception as p_err:
+                    print(f"Progress callback error: {p_err}")
+
+            # check if the number of files is greater than 30
             if checker > 30:
                 break
             # create the name for the image
@@ -301,11 +325,6 @@ class Sfwa:
                 elif self.validate_animated_webp(file):
                     # transform and save the image to webp
                     self.transform_webp(file, directory, destiny, file_name)
-                # check if the weight final image is less than 512000
-                # is_valid = self.validate_weight(f"{destiny}/{file_name}")
-                # remove the image if the weight is greater than 512000 to not create compatibility issues
-                # if not is_valid:
-                #     os.remove(file_name)
             else:
                 # validate the file is an image
                 if self.validate_img(file):
@@ -316,7 +335,7 @@ class Sfwa:
                         img = img.resize((512, 512))
                         img.save(f"{destiny}/{file_name}")
                         img.close()
-                    if file.endswith(".png"):
+                    elif file.endswith(".png"):
                         img_png = Image.open(file)
                         has_transparency = self.has_transparency(img_png)
                         img_png.close()
@@ -334,7 +353,10 @@ class Sfwa:
                         img.close()
             # check if the conserve the images
             if not conserve_imgs:
-                os.remove(file)  # remove the image
+                try:
+                    os.remove(file)  # remove the image
+                except Exception:
+                    pass
 
     # ~ return list of all files in the directory passed
     def files_in_dir(self, directory):
@@ -380,7 +402,6 @@ class Sfwa:
     # ~ validate the weight of the file
     def validate_weight(self, file_name, weight=512000):
         file_weight = os.path.getsize(file_name)
-        print("peso", file_weight)
         if file_weight > weight:
             return False
         else:
@@ -416,7 +437,6 @@ class Sfwa:
 
     # ~ return an Pillow image object transformed to params passed
     def transform_image(self, file_name, size=(512, 512), radius=8):
-        # has_transparency = self.has_transparency(file_name)
         # convert the radius to the size of the image
         radius = int(size[0] / 100 * radius)
         # open the image
@@ -428,66 +448,43 @@ class Sfwa:
         width, heigth = img.size
         # create a correct dimensions
         value_resize = (size[0], int(heigth * size[0] / width)) if width > heigth else (int(width * size[1] / heigth), size[1])
-        # value_resize = (width_complete,heigth_complete)
         if width < size[0] or heigth < size[0]:
             img = img.resize(value_resize)
         # make the thumbnail of the image to conserve the proportions
         img.thumbnail(size)
-        # create mask for give the shape of the image
-        # mask = Image.new('RGBA', img.size, (0, 0, 0, 0))
         mask = Image.new("L", img.size, 0)
         draw = ImageDraw.Draw(mask)
-        # create round rectangle params = ((x, y) + (width, height), radius, fill=0-255 it's the opacity)
         draw.rounded_rectangle((0, 0) + img.size, radius=radius, fill=255)
-        # apply the mask to the image
         img_masked = Image.new("RGBA", size, (0, 0, 0, 0))
         img_masked.paste(img, mask=mask)
-        # create background image transparent
         img_output = Image.new("RGBA", size, (0, 0, 0, 0))
-        # define the position of the image
         x = int((size[0] - img.size[0]) / 2)
         y = int((size[1] - img.size[1]) / 2)
-        # paste the image to the background in the center
         img_output.paste(img_masked, (x, y))
-        # close the images
         img.close()
         mask.close()
         img_masked.close()
-        # return the image output #^ remember close the image after use
         return img_output
 
     # ~ transform the animated image
     def transform_gif(self, file_name, dir, save_name):
-        # define the color system
         GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_FIRST
-        # open the image with the gif format
         img = Image.open(file_name)
-        # get the duration of the gif
-        duration = img.info["duration"]
-        # create list for save the name frames
+        duration = img.info.get("duration", 80)
         frames = []
-        # iterate the frames of the gif
         for frame in range(0, img.n_frames):
             img.seek(frame)
             name = f"{dir}{frame}.webp"
             img.save(name)
-            # transform the image to set the sticker style and append to the array
             frames.append(self.transform_image(name))
-            # remove the image frame after use
-            os.remove(name)
-            # * method to compress the image frame a little, but lose the alpha channel .__.
-            # * because the optimize method of pillow is only for jpg images
-            # # compress the image with the quality passed
-            # img_compress_name = self.compress_img(name, quality=25)
-            # # remove the image frame after use
-            # os.remove(name)
-            # # transform the image to set the sticker style and append to the array
-            # frames.append(self.transform_image(img_compress_name))
-            # # remove the compressed image frame after use
-            # os.remove(img_compress_name)
-        # create webp file with the frames in array
+            try:
+                os.remove(name)
+            except Exception:
+                pass
+        
+        output_file = os.path.join(dir, save_name)
         frames[0].save(
-            f"{dir}/{save_name}",
+            output_file,
             save_all=True,
             append_images=frames,
             transparency=0,
@@ -495,8 +492,32 @@ class Sfwa:
             duration=duration,
             optimize=True,
         )
-        # close the image after use
         img.close()
+
+        # Adaptive Compression Guard for < 500 KB Limit
+        if os.path.exists(output_file) and os.path.getsize(output_file) > 500000 and len(frames) > 2:
+            step_frames = frames[::2]
+            step_duration = duration * 2
+            step_frames[0].save(
+                output_file,
+                save_all=True,
+                append_images=step_frames,
+                transparency=0,
+                loop=0,
+                duration=step_duration,
+                optimize=True,
+            )
+            if os.path.getsize(output_file) > 500000:
+                resized_frames = [f.resize((350, 350)) for f in step_frames]
+                resized_frames[0].save(
+                    output_file,
+                    save_all=True,
+                    append_images=resized_frames,
+                    transparency=0,
+                    loop=0,
+                    duration=step_duration,
+                    optimize=True,
+                )
 
     # ~ transform the webp animated image
     def transform_webp(self, file_name, directory, destiny, save_name):

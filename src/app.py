@@ -60,6 +60,21 @@ class Api:
             return response
         return None
 
+    def cancelProcessing(self):
+        sfwa.cancel_processing()
+        return True
+
+    def getFolderImages(self, folder):
+        if not folder or not os.path.isdir(folder):
+            return []
+        try:
+            files = sfwa.files_in_dir(folder)
+            valid_imgs = [f for f in files if sfwa.validate_img(f) or sfwa.validate_gif(f)]
+            return valid_imgs[:30]
+        except Exception as e:
+            print(f"Error getting folder images: {e}")
+            return []
+
     def openFolder(self, folder):
         sfwa.open_folder(folder)
 
@@ -73,7 +88,14 @@ class Api:
         sfwa.open_github()
 
     def createPack(self, data):
-        response = sfwa.create_pack(data)
+        def progress_cb(current, total):
+            percent = int((current / total) * 100) if total > 0 else 0
+            try:
+                window.evaluate_js(f"if (typeof updateProgress === 'function') updateProgress({percent}, {current}, {total});")
+            except Exception:
+                pass
+
+        response = sfwa.create_pack(data, progress_callback=progress_cb)
         return response
 
 

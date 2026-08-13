@@ -258,10 +258,47 @@ function openFolder(e) {
     }
 }
 
+let ignoredFiles = [];
+
 function selectFolder(e) {
     e.preventDefault();
     pywebview.api.selectFolder(directory).then((response) => {
-        document.getElementById('textInputFolder').value = response;
+        if (response) {
+            document.getElementById('textInputFolder').value = response;
+            loadFolderPreview(response);
+        }
+    });
+}
+
+function loadFolderPreview(folderPath) {
+    ignoredFiles = [];
+    const grid = document.getElementById('gridPreview');
+    if (!grid) return;
+    grid.innerHTML = '';
+    pywebview.api.getFolderImages(folderPath).then((imgs) => {
+        if (imgs && imgs.length > 0) {
+            grid.style.display = 'flex';
+            imgs.forEach((file) => {
+                const tag = document.createElement('span');
+                tag.style.cssText = "font-size:10px; padding:2px 6px; background:#27c900; color:#fff; border-radius:4px; cursor:pointer; user-select:none;";
+                tag.textContent = file;
+                tag.title = "Clic para incluir/excluir";
+                tag.onclick = () => {
+                    if (ignoredFiles.includes(file)) {
+                        ignoredFiles = ignoredFiles.filter(f => f !== file);
+                        tag.style.background = "#27c900";
+                        tag.style.textDecoration = "none";
+                    } else {
+                        ignoredFiles.push(file);
+                        tag.style.background = "#e43131";
+                        tag.style.textDecoration = "line-through";
+                    }
+                };
+                grid.appendChild(tag);
+            });
+        } else {
+            grid.style.display = 'none';
+        }
     });
 }
 
@@ -327,6 +364,21 @@ function closeApp() {
     }
     pywebview.api.closeApp(userPreferences);
 }
+
+function updateProgress(percent, current, total) {
+    const text = document.getElementById('progressText');
+    if (text) {
+        text.textContent = `${percent}% (${current}/${total})`;
+    }
+}
+
+function cancelProcess(e) {
+    if (e) e.preventDefault();
+    pywebview.api.cancelProcessing().then(() => {
+        stateAnimationLoop(false);
+    });
+}
+
 async function createPack(e) {
     e.preventDefault();
     let validator = validation();
@@ -340,12 +392,16 @@ async function createPack(e) {
             directory: document.getElementById('textInputFolder').value,
             icon: document.getElementById('iconDirectory').value,
             conserve: document.getElementById('conserveImgs').checked,
+            ignored_files: ignoredFiles
         }
+        updateProgress(0, 0, 0);
         stateAnimationLoop(true);
         await pywebview.api.createPack(formData).then((response) => {
             console.log(response);
             stateAnimationLoop(false);
-            stateSuccess(true);
+            if (response) {
+                stateSuccess(true);
+            }
         });
     }
 }
