@@ -160,10 +160,8 @@ form {
   /* height: 445px; */
   height: 100%;
   width: 100%;
-  padding: 1rem;
-  /* padding: 2rem 1rem 0 1rem; */
-  gap: 0.9rem;
-  /* background-color: var(--bg-body); */
+  padding: 0.5rem 1rem;
+  gap: 0.65rem;
   z-index: 0;
   /* filter: blur(3px); */
 }

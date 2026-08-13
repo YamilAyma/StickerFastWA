@@ -102,16 +102,18 @@
             <p id="requiredMsgAuthor">required</p>
           </div>
         </div>
-        <div class="crop-options" style="display:flex; align-items:center; justify-content:center; gap:10px; margin:2px 0 6px 0; font-size:0.7rem; color:var(--color-text);">
-          <span style="opacity:0.8;">Corte Video:</span>
-          <label style="display:flex; align-items:center; gap:3px; cursor:pointer;" data-tooltip="Recorte 1:1 Cuadrado Central" data-flow="top">
-            <input type="radio" name="cropMode" value="center_crop" checked /> 1:1 Cuadrado
-          </label>
-          <label style="display:flex; align-items:center; gap:3px; cursor:pointer;" data-tooltip="Mantener Proporción Original" data-flow="top">
-            <input type="radio" name="cropMode" value="fit" /> Original
-          </label>
+        <div style="display:flex; align-items:center; justify-content:space-between; width:80%; font-size:0.65rem; color:var(--color-text); margin:1px 0;">
+          <span class="max-img" id="textMaxImgs" style="font-size:0.65rem;">Max Images</span>
+          <div class="crop-options" style="display:flex; align-items:center; gap:6px;">
+            <span style="opacity:0.75;">Corte:</span>
+            <label style="display:flex; align-items:center; gap:2px; cursor:pointer;" data-tooltip="Recorte 1:1 Cuadrado" data-flow="top">
+              <input type="radio" name="cropMode" value="center_crop" checked /> 1:1
+            </label>
+            <label style="display:flex; align-items:center; gap:2px; cursor:pointer;" data-tooltip="Mantener Proporción" data-flow="top">
+              <input type="radio" name="cropMode" value="fit" /> Orig
+            </label>
+          </div>
         </div>
-        <span class="max-img" id="textMaxImgs">Max Images</span>
         <div class="for-required">
           <div class="folder">
             <button class="open-folder" data-tooltip="Open Folde" data-flow="right" id="textOpenFolder"
