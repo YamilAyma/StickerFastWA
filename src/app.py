@@ -74,11 +74,29 @@ class Api:
             import io
             import base64
             files = sfwa.files_in_dir(folder)
-            valid_imgs = [f for f in files if sfwa.validate_img(f) or sfwa.validate_gif(f)][:30]
+            valid_files = [f for f in files if sfwa.validate_img(f) or sfwa.validate_gif(f) or sfwa.validate_video(f)][:30]
             result = []
-            for f in valid_imgs:
+            for f in valid_files:
                 full_path = os.path.join(folder, f)
                 try:
+                    if sfwa.validate_video(f):
+                        try:
+                            import cv2
+                            cap = cv2.VideoCapture(full_path)
+                            ret, frame = cap.read()
+                            cap.release()
+                            if ret:
+                                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                                img = Image.fromarray(frame_rgb)
+                                img.thumbnail((96, 96))
+                                buf = io.BytesIO()
+                                img.save(buf, format="PNG")
+                                b64 = base64.b64encode(buf.getvalue()).decode()
+                                result.append({"name": f, "encode": b64})
+                                continue
+                        except Exception as v_err:
+                            print(f"Video thumbnail error for {f}: {v_err}")
+
                     with Image.open(full_path) as img:
                         img.thumbnail((96, 96))
                         buf = io.BytesIO()

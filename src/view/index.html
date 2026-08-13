@@ -102,6 +102,15 @@
             <p id="requiredMsgAuthor">required</p>
           </div>
         </div>
+        <div class="crop-options" style="display:flex; align-items:center; justify-content:center; gap:10px; margin:2px 0 6px 0; font-size:0.7rem; color:var(--color-text);">
+          <span style="opacity:0.8;">Corte Video:</span>
+          <label style="display:flex; align-items:center; gap:3px; cursor:pointer;" data-tooltip="Recorte 1:1 Cuadrado Central" data-flow="top">
+            <input type="radio" name="cropMode" value="center_crop" checked /> 1:1 Cuadrado
+          </label>
+          <label style="display:flex; align-items:center; gap:3px; cursor:pointer;" data-tooltip="Mantener Proporción Original" data-flow="top">
+            <input type="radio" name="cropMode" value="fit" /> Original
+          </label>
+        </div>
         <span class="max-img" id="textMaxImgs">Max Images</span>
         <div class="for-required">
           <div class="folder">

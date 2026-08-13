@@ -422,6 +422,14 @@ async function createPack(e) {
     let validator = validation();
     if (validator) {
         let packageApp = getPackageApp();
+        const cropRadios = document.getElementsByName('cropMode');
+        let selectedCropMode = 'center_crop';
+        for (const r of cropRadios) {
+            if (r.checked) {
+                selectedCropMode = r.value;
+                break;
+            }
+        }
         const formData = {
             package: packageApp,
             animated: document.getElementById('animated').checked,
@@ -430,7 +438,8 @@ async function createPack(e) {
             directory: document.getElementById('textInputFolder').value,
             icon: document.getElementById('iconDirectory').value,
             conserve: document.getElementById('conserveImgs').checked,
-            ignored_files: ignoredFiles
+            ignored_files: ignoredFiles,
+            crop_mode: selectedCropMode
         }
         updateProgress(0, 0, 0);
         stateAnimationLoop(true);

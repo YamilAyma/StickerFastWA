@@ -152,12 +152,13 @@ class Sfwa:
         data = self.serialize_data(data)
         response = False  # response default is false
         ignored_files = getattr(data, 'ignored_files', None)
+        crop_mode = getattr(data, 'crop_mode', 'center_crop')
         try:
             # evaluate the data app select for the user and call the function to create compatible the pack with that app
             if data.package == "stickerMaker":
-                response = self.create_pack_sticker_maker(data, progress_callback=progress_callback, ignored_files=ignored_files)
+                response = self.create_pack_sticker_maker(data, progress_callback=progress_callback, ignored_files=ignored_files, crop_mode=crop_mode)
             else:
-                response = self.create_pack_wemoji(data, progress_callback=progress_callback, ignored_files=ignored_files)
+                response = self.create_pack_wemoji(data, progress_callback=progress_callback, ignored_files=ignored_files, crop_mode=crop_mode)
         except Exception as e:
             print(f"Error creating pack: {e}")
             response = False
@@ -166,7 +167,7 @@ class Sfwa:
         return response  # return the response
 
     # ~ Create the pack for the wemoji app
-    def create_pack_wemoji(self, data, progress_callback=None, ignored_files=None):
+    def create_pack_wemoji(self, data, progress_callback=None, ignored_files=None, crop_mode="center_crop"):
         # copy the compresed file to the directory of the user
         dir_origin = os.path.join(root, "src", "resources", "compressed")
         zip_file_name = "wemoji.wemojipack"
@@ -209,7 +210,7 @@ class Sfwa:
         img_icon.save(icon_name)
         img_icon.close()
         # process the lote of images
-        self.process_images(data.directory, folder_name, data.animated, data.conserve, progress_callback=progress_callback, ignored_files=ignored_files)
+        self.process_images(data.directory, folder_name, data.animated, data.conserve, progress_callback=progress_callback, ignored_files=ignored_files, crop_mode=crop_mode)
         os.chdir(data.directory)
         # add the folder with all files in the zip file
         self.add_folder_to_zip(zip_file_name, folder_name)
@@ -221,7 +222,7 @@ class Sfwa:
         return True  # return the response
 
     # ~ Create the pack for the sticker maker app
-    def create_pack_sticker_maker(self, data, progress_callback=None, ignored_files=None):
+    def create_pack_sticker_maker(self, data, progress_callback=None, ignored_files=None, crop_mode="center_crop"):
         # copy the compresed file to the directory of the user
         dir_origin = os.path.join(root, "src", "resources", "compressed")
         zip_file_name = "stickermaker.wastickers"
@@ -244,7 +245,7 @@ class Sfwa:
         img_icon.save(icon_name)
         img_icon.close()
         # process the lote of images
-        self.process_images(data.directory, folder_name, data.animated, data.conserve, progress_callback=progress_callback, ignored_files=ignored_files)
+        self.process_images(data.directory, folder_name, data.animated, data.conserve, progress_callback=progress_callback, ignored_files=ignored_files, crop_mode=crop_mode)
         os.chdir(data.directory)
         zip_dir = f"{data.directory}/{zip_file_name}"
         folder_dir = f"{data.directory}/{folder_name}"
@@ -284,7 +285,7 @@ class Sfwa:
                 open_file.close()
 
     # ~ process the images in the folder in base params passed
-    def process_images(self, directory, destiny, animated=False, conserve_imgs=True, progress_callback=None, ignored_files=None):
+    def process_images(self, directory, destiny, animated=False, conserve_imgs=True, progress_callback=None, ignored_files=None, crop_mode="center_crop"):
         # change to the directory passed
         os.chdir(directory)
         # list the image files in the directory
@@ -318,16 +319,21 @@ class Sfwa:
             file_name = f"{self.create_name('WS')}.{file_format}"
             # check if the pack is animated
             if animated:
-                # validate the file is an animated image
+                # validate the file is an animated image or video
                 if self.validate_gif(file):
                     # transform and save the image to webp
                     self.transform_gif(file, destiny, file_name)
+                elif self.validate_video(file):
+                    # transform video to animated webp with chosen crop_mode
+                    self.process_video_file(file, destiny, file_name, crop_mode=crop_mode)
                 elif self.validate_animated_webp(file):
                     # transform and save the image to webp
                     self.transform_webp(file, directory, destiny, file_name)
             else:
-                # validate the file is an image
-                if self.validate_img(file):
+                # validate the file is an image or video
+                if self.validate_video(file):
+                    self.process_video_file(file, destiny, file_name, crop_mode=crop_mode)
+                elif self.validate_img(file):
                     # check if the image is a .webp
                     if file.endswith(".webp"):
                         # open the image and only rezise it
@@ -398,6 +404,147 @@ class Sfwa:
             return True
         else:
             return False
+
+    # ~ return boolean, if the file is a video
+    def validate_video(self, file_name):
+        exts = (".mp4", ".webm", ".mov", ".avi", ".mkv")
+        return file_name.lower().endswith(exts)
+
+    # ~ process video file into webp animated sticker with crop_mode
+    def process_video_file(self, video_path, dir_destiny, save_name, crop_mode="center_crop"):
+        try:
+            import cv2
+        except ImportError:
+            print("OpenCV (cv2) not installed. Cannot process video.")
+            return False
+
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            print(f"Cannot open video file: {video_path}")
+            return False
+
+        fps = cap.get(cv2.CAP_PROP_FPS) or 24
+        sample_interval = max(1, int(fps / 12))  # Target ~12 FPS
+        frames = []
+        frame_idx = 0
+
+        while True:
+            ret, frame = cap.read()
+            if not ret or len(frames) >= 45:  # Max 3-4 seconds
+                break
+
+            if frame_idx % sample_interval == 0:
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                h, w, _ = frame_rgb.shape
+
+                if crop_mode == "center_crop":
+                    # Exact 1:1 Center Crop
+                    side = min(h, w)
+                    x_start = (w - side) // 2
+                    y_start = (h - side) // 2
+                    cropped = frame_rgb[y_start:y_start+side, x_start:x_start+side]
+                    img_pil = Image.fromarray(cropped)
+                else:
+                    # Fit original aspect ratio
+                    img_pil = Image.fromarray(frame_rgb)
+
+                img_pil = img_pil.convert("RGBA")
+                sticker_frame = self.transform_image_obj(img_pil)
+                frames.append(sticker_frame)
+
+            frame_idx += 1
+
+        cap.release()
+
+        if not frames:
+            return False
+
+        output_file = os.path.join(dir_destiny, save_name)
+        duration = int(1000 / 12)  # ~83ms per frame
+
+        frames[0].save(
+            output_file,
+            save_all=True,
+            append_images=frames[1:],
+            transparency=0,
+            loop=0,
+            duration=duration,
+            optimize=True,
+        )
+
+        # Multi-level Adaptive Compression Guard to strictly ensure < 500 KB
+        self.apply_adaptive_compression(output_file, frames, duration)
+        return True
+
+    def apply_adaptive_compression(self, output_file, frames, duration):
+        if not os.path.exists(output_file):
+            return
+
+        max_bytes = 500000
+
+        # Level 1: Frame Stepping (half frame count)
+        if os.path.getsize(output_file) > max_bytes and len(frames) > 4:
+            step_frames = frames[::2]
+            step_duration = duration * 2
+            step_frames[0].save(
+                output_file,
+                save_all=True,
+                append_images=step_frames[1:],
+                transparency=0,
+                loop=0,
+                duration=step_duration,
+                optimize=True,
+            )
+
+        # Level 2: Resize frames to 384x384
+        if os.path.exists(output_file) and os.path.getsize(output_file) > max_bytes and len(frames) > 4:
+            step_frames = [f.resize((384, 384)) for f in frames[::2]]
+            step_duration = duration * 2
+            step_frames[0].save(
+                output_file,
+                save_all=True,
+                append_images=step_frames[1:],
+                transparency=0,
+                loop=0,
+                duration=step_duration,
+                optimize=True,
+            )
+
+        # Level 3: Resize frames to 256x256
+        if os.path.exists(output_file) and os.path.getsize(output_file) > max_bytes and len(frames) > 4:
+            step_frames = [f.resize((256, 256)) for f in frames[::3]]
+            step_duration = duration * 3
+            step_frames[0].save(
+                output_file,
+                save_all=True,
+                append_images=step_frames[1:],
+                transparency=0,
+                loop=0,
+                duration=step_duration,
+                optimize=True,
+            )
+
+    def transform_image_obj(self, img, size=(512, 512), radius=8):
+        radius = int(size[0] / 100 * radius)
+        if img.mode != "RGBA":
+            img = img.convert("RGBA")
+        width, heigth = img.size
+        value_resize = (size[0], int(heigth * size[0] / width)) if width > heigth else (int(width * size[1] / heigth), size[1])
+        if width < size[0] or heigth < size[0]:
+            img = img.resize(value_resize)
+        img.thumbnail(size)
+        mask = Image.new("L", img.size, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.rounded_rectangle((0, 0) + img.size, radius=radius, fill=255)
+        img_masked = Image.new("RGBA", size, (0, 0, 0, 0))
+        img_masked.paste(img, mask=mask)
+        img_output = Image.new("RGBA", size, (0, 0, 0, 0))
+        x = int((size[0] - img.size[0]) / 2)
+        y = int((size[1] - img.size[1]) / 2)
+        img_output.paste(img_masked, (x, y))
+        mask.close()
+        img_masked.close()
+        return img_output
 
     # ~ validate the weight of the file
     def validate_weight(self, file_name, weight=512000):
