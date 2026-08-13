@@ -1,6 +1,5 @@
 from PIL import Image, ImageDraw, GifImagePlugin, ImageChops
 from os.path import isfile, join
-from gi.repository import GLib
 from munch import DefaultMunch
 from datetime import datetime
 import numpy as np
@@ -14,6 +13,12 @@ import webp
 import json
 import os
 
+try:
+    from gi.repository import GLib
+    HAS_GLIB = True
+except ImportError:
+    HAS_GLIB = False
+
 
 class Sfwa:
     def __init__(self):
@@ -22,7 +27,7 @@ class Sfwa:
 
     # ~ GET the user preferences for the GUI
     def get_user_preferences(self):
-        file = r"src/data/user.json"
+        file = os.path.join(root, "src", "data", "user.json")
         # open the file in read mode
         with open(file, "r") as read_file:
             data = json.load(read_file)  # load the data
@@ -34,28 +39,35 @@ class Sfwa:
                 "animatedIsShow": data["animatedIsShow"],
             }
         # verify if the directory is valid and if it is not valid, set the default pictures directory as the directory
-        if response["directory"] == "" or not os.path.isfile(response["directory"]):
+        if response["directory"] == "" or not os.path.isdir(response["directory"]):
             response["directory"] = self.get_default_dir()
         return response  # return the response
 
     # ~ POST the user preferences for the GUI
     def set_user_preferences(self, data):
+        if not isinstance(data, dict):
+            return
+        lang = data.get("lang") or data.get("language") or "es"
+        theme = data.get("theme") or "dark"
+        directory = data.get("directory") or ""
+        animated_is_show = data.get("animatedIsShow", True)
+
         # modify the keys in data creating a new dict in the same variable
-        data = {
-            "language": data["lang"],
-            "theme": data["theme"],
-            "directory": data["directory"],
-            "animatedIsShow": data["animatedIsShow"],
+        data_to_save = {
+            "language": lang,
+            "theme": theme,
+            "directory": directory,
+            "animatedIsShow": animated_is_show,
         }
-        file = r"src/data/user.json"
+        file = os.path.join(root, "src", "data", "user.json")
         # open the file in write mode to overwrite the data
         with open(file, "w") as write_file:
-            json.dump(data, write_file, indent=4)  # inserting the new data
+            json.dump(data_to_save, write_file, indent=4)  # inserting the new data
 
     # ~ GET the language json file
     def get_language_json(self, lang):
         # get the directory of the language in base lang param
-        file = f"src/lang/{lang}.json"
+        file = os.path.join(root, "src", "lang", f"{lang}.json")
         # open in read mode the file
         with open(file, "r") as read_file:
             response = json.load(read_file)  # load the response
@@ -67,15 +79,20 @@ class Sfwa:
         os_system = platform.system()
         # return dir of pictures folder
         if os_system == "Windows":
-            return f"C:/users/{os.getlogin()}/pictures"
-        elif os_system == "Linux":
-            return GLib.get_user_special_dir(GLib.USER_DIRECTORY_PICTURES)
+            return os.path.join(os.path.expanduser("~"), "Pictures").replace("\\", "/")
+        elif os_system == "Linux" and HAS_GLIB:
+            try:
+                return GLib.get_user_special_dir(GLib.USER_DIRECTORY_PICTURES)
+            except Exception:
+                pass
+        return os.path.join(os.path.expanduser("~"), "Pictures").replace("\\", "/")
 
     # ~ return string with the base64 of the image directory passed
     def create_encode_icon(self, icon):
         new_img = open(icon, "rb")  # open the file
         # encode the image in base64
         new_img_encode = base64.b64encode(new_img.read())
+        new_img.close()
         return new_img_encode  # return the base64 of the image
 
     # ~ open the directory folder passed
@@ -84,31 +101,31 @@ class Sfwa:
         os_system = platform.system()
         # open the folder in the user operative system
         if os_system == "Windows":
-            os.starfile(folder)
+            os.startfile(folder)
         elif os_system == "Linux":
             subprocess.Popen(["xdg-open", folder])
 
     # ~ open the license file in base of the language passed
     def open_license(self, lang):
         # get the directory of the licence in base lang param
-        license = f"src/resources/license/license_{lang}.pdf"
+        license = os.path.join(root, "src", "resources", "license", f"license_{lang}.pdf")
         # get the user operative system
         os_system = platform.system()
         # open the file in the user operative system
         if os_system == "Windows":
-            os.starfile(license)
+            os.startfile(license)
         elif os_system == "Linux":
             subprocess.Popen(["xdg-open", license])
 
     # ~ open the terms of use file in base of the language passed
     def open_terms(self, lang):
         # get the directory of the terms in base lang param
-        terms = f"src/resources/terms/terms_{lang}.pdf"
+        terms = os.path.join(root, "src", "resources", "terms", f"terms_{lang}.pdf")
         # get the user operative system
         os_system = platform.system()
         # open the file in the user operative system
         if os_system == "Windows":
-            os.starfile(terms)
+            os.startfile(terms)
         elif os_system == "Linux":
             subprocess.Popen(["xdg-open", terms])
 
@@ -128,18 +145,23 @@ class Sfwa:
         # serialize the data
         data = self.serialize_data(data)
         response = False  # response default is false
-        # evaluate the data app select for the user and call the function to create compatible the pack with that app
-        if data.package == "stickerMaker":
-            response = self.create_pack_sticker_maker(data)
-        else:
-            response == self.create_pack_wemoji(data)
-        os.chdir(root)  # change to the root directory for the next operations
+        try:
+            # evaluate the data app select for the user and call the function to create compatible the pack with that app
+            if data.package == "stickerMaker":
+                response = self.create_pack_sticker_maker(data)
+            else:
+                response = self.create_pack_wemoji(data)
+        except Exception as e:
+            print(f"Error creating pack: {e}")
+            response = False
+        finally:
+            os.chdir(root)  # change to the root directory for the next operations
         return response  # return the response
 
     # ~ Create the pack for the wemoji app
     def create_pack_wemoji(self, data):
         # copy the compresed file to the directory of the user
-        dir_origin = "src/resources/compressed"
+        dir_origin = os.path.join(root, "src", "resources", "compressed")
         zip_file_name = "wemoji.wemojipack"
         self.copy_file(dir_origin, data.directory, zip_file_name)
         # change of directory to the directory of the user
@@ -194,7 +216,7 @@ class Sfwa:
     # ~ Create the pack for the sticker maker app
     def create_pack_sticker_maker(self, data):
         # copy the compresed file to the directory of the user
-        dir_origin = "src/resources/compressed"
+        dir_origin = os.path.join(root, "src", "resources", "compressed")
         zip_file_name = "stickermaker.wastickers"
         self.copy_file(dir_origin, data.directory, zip_file_name)
         # change of directory to the directory of the user
@@ -231,15 +253,13 @@ class Sfwa:
     # ~ copy the file to the directory
     def copy_file(self, dir_origin, dir_to_move, file_name):
         # copy the file from directory origin to directory to move
-        shutil.copy(f"{dir_origin}/{file_name}", f"{dir_to_move}/{file_name}")
+        shutil.copy(os.path.join(dir_origin, file_name), os.path.join(dir_to_move, file_name))
 
     # ~ return string, with prefix pass and 17 numbers exaple sufix WS: WS20220712168203521
     def create_name(self, prefix):
-        # create the number with the datatime
-        date = str(datetime.now())
-        name = date.replace("-", "").replace(":", "").replace(" ", "").split(".")
-        name = f'{prefix}{name[0]}{name[-1][:3]}'
-        return name
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d%H%M%S") + f"{now.microsecond // 1000:03d}"
+        return f"{prefix}{timestamp}"
 
     # ~ open the text file with the mode passed
     def open_text_file(self, file_name, mode, sentence=None, is_json=False):
@@ -407,7 +427,7 @@ class Sfwa:
         # get the size of the image
         width, heigth = img.size
         # create a correct dimensions
-        value_resize = (size,int(heigth * size / width)) if width > heigth else (int(width * size / heigth),size)
+        value_resize = (size[0], int(heigth * size[0] / width)) if width > heigth else (int(width * size[1] / heigth), size[1])
         # value_resize = (width_complete,heigth_complete)
         if width < size[0] or heigth < size[0]:
             img = img.resize(value_resize)
