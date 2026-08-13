@@ -48,7 +48,7 @@ class Api:
     def selectIcon(self):
         dialog_type = getattr(webview, 'FileDialog', webview).OPEN if hasattr(webview, 'FileDialog') else webview.OPEN_DIALOG
         file_types = (
-            'Image Files (*.png; *.jpg; *.jpeg; *.webp; *.PNG; *.JPG; *.JPEG; *.WEBP)',
+            'Image Files (*.png;*.jpg;*.jpeg;*.webp)',
             'All Files (*.*)'
         )
         file = window.create_file_dialog(
