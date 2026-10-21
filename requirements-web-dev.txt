@@ -1,3 +1,4 @@
 -r requirements-web.txt
 pytest
 httpx
+playwright

@@ -176,3 +176,18 @@ def test_custom_icon_does_not_become_a_sticker(tmp_path):
             with Image.open(io.BytesIO(archive.read('tray_icon.png'))) as icon:
                 assert icon.size == (96, 96)
                 assert icon.getpixel((48, 48))[:3] == (0, 128, 0)
+
+
+def test_web_interface_and_assets_are_served(tmp_path):
+    with TestClient(create_app(tmp_path)) as client:
+        page = client.get('/')
+        assert page.status_code == 200
+        assert 'text/html' in page.headers['content-type']
+        assert 'id="pack-form"' in page.text
+        assert client.get('/web/app.js').status_code == 200
+        assert client.get('/web/style.css').status_code == 200
+        assert client.get('/web/../app.py').status_code == 404
+        response = client.post('/api/jobs', data={'name': 'Test', 'author': 'Test'},
+                               files={'files': ('fake.png', b'invalid')})
+        assert response.status_code == 422
+        assert str(tmp_path) not in response.text

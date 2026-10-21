@@ -13,7 +13,8 @@ import uuid
 import zipfile
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from PIL import Image
 
@@ -103,8 +104,10 @@ def validate_media(path: Path, animated: bool, icon: bool = False):
                 if not icon and not animated and getattr(image, 'n_frames', 1) > 1:
                     raise ValueError('Activa el modo animado para archivos animados.')
                 image.verify()
-    except (OSError, ValueError, Image.DecompressionBombError) as error:
+    except ValueError as error:
         raise HTTPException(422, str(error)) from error
+    except (OSError, Image.DecompressionBombError) as error:
+        raise HTTPException(422, 'No se pudo leer el archivo. Comprueba que sea una imagen o un video válido.') from error
 
 
 def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) -> FastAPI:
@@ -124,6 +127,8 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
         shutil.rmtree(root, ignore_errors=True)
 
     app = FastAPI(title='StickerFastWA Local', version='0.1.0', lifespan=lifespan)
+    web_dir = Path(__file__).resolve().parent / 'web'
+    app.mount('/web', StaticFiles(directory=web_dir), name='web')
     app.add_middleware(UploadLimitMiddleware)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]', 'testserver'])
 
@@ -195,7 +200,7 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
 
     @app.get('/', include_in_schema=False)
     def index():
-        return RedirectResponse('/docs')
+        return FileResponse(web_dir / 'index.html')
 
     @app.get('/api/health')
     def health():

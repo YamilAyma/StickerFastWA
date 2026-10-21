@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>StickerFast WA · Crea tu pack</title>
+    <link rel="stylesheet" href="/web/style.css" />
+    <script src="/web/app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="StickerFast WA, inicio"
+        ><span class="brand-icon" aria-hidden="true"
+          >S<svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            aria-hidden="true"
+          >
+            <path d="M5 19 19 5M5 5h14v14" /></svg></span
+        ><span>StickerFast <strong>WA</strong></span></a
+      >
+      <div class="header-actions">
+        <span class="local-badge"><span></span> En tu equipo</span
+        ><button
+          type="button"
+          id="theme"
+          class="quiet"
+          aria-label="Cambiar a tema claro"
+        >
+          Tema claro
+        </button>
+      </div>
+    </header>
+    <main>
+      <div class="intro">
+        <div>
+          <p class="eyebrow">DE TU GALERÍA A WHATSAPP</p>
+          <h1>Pequeños stickers.<br /><span>Grandes conversaciones.</span></h1>
+          <p class="intro-copy">
+            Reúne tus favoritos, dale un nombre al pack y llévalo a tu próximo
+            chat.
+          </p>
+        </div>
+        <div class="intro-note">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            aria-hidden="true"
+          >
+            <path d="M5 19 19 5M5 5h14v14" />
+          </svg>
+          Imágenes, GIF y videos.<br />Un pack con tu estilo.
+        </div>
+      </div>
+      <form id="pack-form" class="workspace">
+        <section class="media-panel panel" aria-labelledby="media-title">
+          <div class="section-heading">
+            <div>
+              <p class="step">01 / TU COLECCIÓN</p>
+              <h2 id="media-title">Elige tus stickers</h2>
+            </div>
+            <span class="count" id="count">0 / 30</span>
+          </div>
+          <div id="dropzone" class="dropzone">
+            <span class="upload-icon" aria-hidden="true">↑</span>
+            <h3>Arrastra tus archivos aquí</h3>
+            <p>O selecciónalos desde tu equipo.</p>
+            <label class="button secondary file-picker"
+              >Añadir archivos<input
+                id="files"
+                type="file"
+                multiple
+                accept=".png,.jpg,.jpeg,.webp,.gif,.mp4,.webm,.mov,.avi,.mkv"
+            /></label>
+            <small
+              >Hasta 30 stickers · 25 MB por archivo · 100 MB en total</small
+            >
+          </div>
+          <div class="collection-toolbar" id="collection-toolbar" hidden>
+            <p id="selection-summary"></p>
+            <button type="button" id="clear" class="text-button">
+              Vaciar colección
+            </button>
+          </div>
+          <div id="media-grid" class="media-grid"></div>
+          <div class="empty-note" id="empty-note">
+            <span aria-hidden="true">✦</span>
+            <p>
+              Tu próxima colección empieza aquí.<br /><span
+                >Puedes quitar o desmarcar archivos antes de crear el
+                pack.</span
+              >
+            </p>
+          </div>
+          <p class="privacy-note">
+            Tus archivos se procesan en el servidor local y se eliminan al
+            terminar.
+          </p>
+        </section>
+        <aside class="settings-panel panel" aria-labelledby="settings-title">
+          <fieldset id="settings-fields">
+            <div class="section-heading">
+              <div>
+                <p class="step">02 / LOS DETALLES</p>
+                <h2 id="settings-title">Dale tu toque</h2>
+              </div>
+            </div>
+            <label class="field"
+              >Nombre del pack<input
+                id="name"
+                name="name"
+                required
+                maxlength="80"
+                placeholder="Mis favoritos"
+                autocomplete="off"
+            /></label>
+            <label class="field"
+              >Autor<input
+                id="author"
+                name="author"
+                required
+                maxlength="80"
+                placeholder="Tu nombre o alias"
+                autocomplete="nickname"
+            /></label>
+            <label class="field"
+              >Exportar para<select id="package" name="package">
+                <option value="stickerMaker">
+                  Sticker Maker · .wastickers
+                </option>
+                <option value="wemoji">Wemoji · .wemojipack</option>
+              </select></label
+            >
+            <div class="mode-switch">
+              <div>
+                <label for="animated">Pack animado</label>
+                <p>Para GIF, WebP animado y videos</p>
+              </div>
+              <input
+                type="checkbox"
+                id="animated"
+                name="animated"
+                role="switch"
+              />
+            </div>
+            <label class="field"
+              >Encuadre del video<select id="crop-mode" name="crop_mode">
+                <option value="center_crop">Recorte central · 1:1</option>
+                <option value="fit">
+                  Original · ajustar con transparencia
+                </option>
+              </select></label
+            >
+            <div class="icon-control">
+              <div class="tray-preview" id="tray-preview" aria-hidden="true">
+                ✦
+              </div>
+              <div>
+                <span class="field-title">Icono del pack</span
+                ><label class="text-button file-picker"
+                  >Elegir imagen<input
+                    id="icon"
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.webp,.gif"
+                    aria-label="Elegir icono del pack" /></label
+                ><button
+                  type="button"
+                  id="remove-icon"
+                  class="text-button"
+                  hidden
+                >
+                  Quitar icono
+                </button>
+                <p id="icon-label">O usaremos el primer sticker.</p>
+              </div>
+            </div>
+          </fieldset>
+          <div class="pack-summary">
+            <span>Seleccionados</span
+            ><strong id="selected-count">0 stickers</strong>
+          </div>
+          <button type="submit" id="create" class="button primary" disabled>
+            Crear mi pack
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path d="M5 19 19 5M5 5h14v14" />
+            </svg>
+          </button>
+          <p class="export-note">
+            Descarga el paquete e impórtalo con la app elegida.
+          </p>
+        </aside>
+      </form>
+      <p id="message" class="message" role="alert" hidden></p>
+      <section
+        id="job-panel"
+        class="job-panel panel"
+        aria-labelledby="job-title"
+        hidden
+      >
+        <div class="job-heading">
+          <div>
+            <p class="step">TU PACK</p>
+            <h2 id="job-title">Preparando tu colección</h2>
+          </div>
+          <span id="job-percentage">0 %</span>
+        </div>
+        <progress
+          id="progress"
+          max="100"
+          value="0"
+          aria-label="Progreso de creación"
+        ></progress>
+        <div class="job-bottom">
+          <p id="job-status" role="status" aria-live="polite">
+            Subiendo archivos…
+          </p>
+          <div class="job-actions">
+            <button type="button" id="retry" class="quiet" hidden>
+              Volver a consultar</button
+            ><button type="button" id="cancel" class="quiet" disabled>
+              Cancelar</button
+            ><a id="download" class="button primary" hidden>Descargar pack ↓</a
+            ><button type="button" id="delete-job" class="quiet" hidden>
+              Eliminar resultado
+            </button>
+          </div>
+        </div>
+      </section>
+      <footer>
+        <span>StickerFast WA</span
+        ><span>Hecho para compartir. Creado por ti.</span>
+      </footer>
+    </main>
+  </body>
+</html>
