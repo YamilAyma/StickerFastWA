@@ -2,7 +2,7 @@
 
 Use one instance per processing job; progress and cancellation belong to that job.
 """
-from PIL import Image, ImageDraw, GifImagePlugin, ImageChops
+from PIL import Image, ImageDraw, ImageChops, ImageOps
 from os.path import isfile, join
 from pathlib import Path
 from munch import DefaultMunch
@@ -37,7 +37,7 @@ class StickerEngine:
         data = self.serialize_data(data)
         response = False  # response default is false
         ignored_files = getattr(data, 'ignored_files', None)
-        crop_mode = getattr(data, 'crop_mode', 'center_crop')
+        crop_mode = getattr(data, 'crop_mode', None) or 'center_crop'
         try:
             # evaluate the data app select for the user and call the function to create compatible the pack with that app
             if data.package == "stickerMaker":
@@ -73,6 +73,8 @@ class StickerEngine:
             self.process_images(str(directory), str(content), data.animated, data.conserve,
                                 progress_callback=progress_callback, ignored_files=ignored_files,
                                 crop_mode=crop_mode)
+            if self.cancel_flag:
+                return False
             with zipfile.ZipFile(archive, "a") as output:
                 for file in content.iterdir():
                     name = str(Path(content.name) / file.name) if package == "wemoji" else file.name
@@ -116,82 +118,28 @@ class StickerEngine:
     def process_images(self, directory, destiny, animated=False, conserve_imgs=True, progress_callback=None, ignored_files=None, crop_mode="center_crop"):
         directory = os.path.abspath(directory)
         destiny = os.path.abspath(destiny)
-        # list the image files in the directory
-        all_files = self.files_in_dir(directory)
-        if ignored_files:
-            files = [f for f in all_files if f not in ignored_files]
-        else:
-            files = all_files
-
-        total_files = min(len(files), 30)
-        checker = 0  # checker for the number of files in the directory
-        file_format = "webp"  # define the final format to the image
-
-        # iterate the image files in the directory
-        for source_name in files:
-            file = os.path.join(directory, source_name)
+        files = [name for name in self.files_in_dir(directory)
+                 if name not in (ignored_files or [])
+                 and (self.validate_img(name) or self.validate_gif(name) or self.validate_video(name))][:30]
+        for index, source_name in enumerate(files, 1):
             if self.cancel_flag:
-                print("Pack creation cancelled by user flag.")
                 break
-
-            checker += 1  # increment the checker
             if progress_callback:
-                try:
-                    progress_callback(checker, total_files)
-                except Exception as p_err:
-                    print(f"Progress callback error: {p_err}")
-
-            # check if the number of files is greater than 30
-            if checker > 30:
+                progress_callback(index, len(files))
+            if self.cancel_flag:
                 break
-            # create the name for the image
-            file_name = f"{self.create_name('WS')}.{file_format}"
-            # check if the pack is animated
-            if animated:
-                # validate the file is an animated image or video
-                if self.validate_gif(file):
-                    # transform and save the image to webp
-                    self.transform_gif(file, destiny, file_name)
-                elif self.validate_video(file):
-                    # transform video to animated webp with chosen crop_mode
-                    self.process_video_file(file, destiny, file_name, crop_mode=crop_mode)
-                elif self.validate_animated_webp(file):
-                    # transform and save the image to webp
-                    self.transform_webp(file, directory, destiny, file_name)
+            source = os.path.join(directory, source_name)
+            name = f"{self.create_name('WS')}.webp"
+            if self.validate_video(source):
+                if not self.process_video_file(source, destiny, name, crop_mode=crop_mode):
+                    raise ValueError("Could not convert video")
+            elif animated:
+                self.transform_gif(source, destiny, name, crop_mode=crop_mode)
             else:
-                # validate the file is an image or video
-                if self.validate_video(file):
-                    self.process_video_file(file, destiny, file_name, crop_mode=crop_mode)
-                elif self.validate_img(file):
-                    # check if the image is a .webp
-                    if file.endswith(".webp"):
-                        # open the image and only rezise it
-                        img = Image.open(file)
-                        img = img.resize((512, 512))
-                        img.save(f"{destiny}/{file_name}")
-                        img.close()
-                    elif file.endswith(".png"):
-                        img_png = Image.open(file)
-                        has_transparency = self.has_transparency(img_png)
-                        img_png.close()
-                        if has_transparency:
-                            # crop the transparent border of the image
-                            self.crop_image(file)
-                        # transform and save the image to webp
-                        img = self.transform_image(file)
-                        img.save(f"{destiny}/{file_name}")
-                        img.close()
-                    else:
-                        # transform and save the image to webp
-                        img = self.transform_image(file)
-                        img.save(f"{destiny}/{file_name}")
-                        img.close()
-            # check if the conserve the images
-            if not conserve_imgs:
-                try:
-                    os.remove(file)  # remove the image
-                except Exception:
-                    pass
+                with self.transform_image(source, crop_mode=crop_mode) as image:
+                    image.save(os.path.join(destiny, name))
+            if not conserve_imgs and not self.cancel_flag:
+                os.remove(source)
 
     # ~ return list of all files in the directory passed
     def files_in_dir(self, directory):
@@ -210,10 +158,11 @@ class StickerEngine:
     # ~ return boolean, if the file is an image
     def validate_img(self, file_name):
         if (
-            file_name.endswith(".jpg")
-            or file_name.endswith(".png")
-            or file_name.endswith(".webp")
-            or file_name.endswith(".jpeg")
+            file_name.lower().endswith(".gif")
+            or file_name.lower().endswith(".jpg")
+            or file_name.lower().endswith(".png")
+            or file_name.lower().endswith(".webp")
+            or file_name.lower().endswith(".jpeg")
         ):
             return True
         else:
@@ -222,14 +171,14 @@ class StickerEngine:
     # ~ return boolean, if the file is an animated image
     def validate_gif(self, file_name):
         # ~ validates if the file is an gif image
-        if file_name.endswith(".gif"):
+        if file_name.lower().endswith(".gif"):
             return True
         else:
             return False
 
     # ~ return boolean, if the file is an animated webp image
     def validate_animated_webp(self, file_name):
-        if file_name.endswith(".webp"):
+        if file_name.lower().endswith(".webp"):
             return True
         else:
             return False
@@ -264,21 +213,8 @@ class StickerEngine:
 
             if frame_idx % sample_interval == 0:
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                h, w, _ = frame_rgb.shape
-
-                if crop_mode == "center_crop":
-                    # Exact 1:1 Center Crop
-                    side = min(h, w)
-                    x_start = (w - side) // 2
-                    y_start = (h - side) // 2
-                    cropped = frame_rgb[y_start:y_start+side, x_start:x_start+side]
-                    img_pil = Image.fromarray(cropped)
-                else:
-                    # Fit original aspect ratio
-                    img_pil = Image.fromarray(frame_rgb)
-
-                img_pil = img_pil.convert("RGBA")
-                sticker_frame = self.transform_image_obj(img_pil)
+                img_pil = Image.fromarray(frame_rgb)
+                sticker_frame = self.transform_image_obj(img_pil, crop_mode=crop_mode)
                 frames.append(sticker_frame)
 
             frame_idx += 1
@@ -353,27 +289,27 @@ class StickerEngine:
                 optimize=True,
             )
 
-    def transform_image_obj(self, img, size=(512, 512), radius=8):
-        radius = int(size[0] / 100 * radius)
-        if img.mode != "RGBA":
-            img = img.convert("RGBA")
-        width, heigth = img.size
-        value_resize = (size[0], int(heigth * size[0] / width)) if width > heigth else (int(width * size[1] / heigth), size[1])
-        if width < size[0] or heigth < size[0]:
-            img = img.resize(value_resize)
-        img.thumbnail(size)
-        mask = Image.new("L", img.size, 0)
-        draw = ImageDraw.Draw(mask)
-        draw.rounded_rectangle((0, 0) + img.size, radius=radius, fill=255)
-        img_masked = Image.new("RGBA", size, (0, 0, 0, 0))
-        img_masked.paste(img, mask=mask)
-        img_output = Image.new("RGBA", size, (0, 0, 0, 0))
-        x = int((size[0] - img.size[0]) / 2)
-        y = int((size[1] - img.size[1]) / 2)
-        img_output.paste(img_masked, (x, y))
+    def transform_image_obj(self, img, size=(512, 512), radius=8, crop_mode="fit"):
+        """Apply the same non-destructive framing to images and animation frames."""
+        if crop_mode not in {"fit", "center_crop"}:
+            raise ValueError("Unknown crop mode")
+        image = ImageOps.exif_transpose(img).convert("RGBA")
+        resize = ImageOps.fit if crop_mode == "center_crop" else ImageOps.contain
+        content = resize(image, size, method=Image.Resampling.LANCZOS)
+        mask = Image.new("L", content.size, 0)
+        ImageDraw.Draw(mask).rounded_rectangle(
+            (0, 0, content.width - 1, content.height - 1),
+            radius=int(size[0] * radius / 100), fill=255,
+        )
+        # Multiply, rather than replace, source alpha so transparent pixels stay transparent.
+        content.putalpha(ImageChops.multiply(content.getchannel("A"), mask))
+        output = Image.new("RGBA", size, (0, 0, 0, 0))
+        output.alpha_composite(content, ((size[0] - content.width) // 2,
+                                         (size[1] - content.height) // 2))
+        image.close()
+        content.close()
         mask.close()
-        img_masked.close()
-        return img_output
+        return output
 
     # ~ validate the weight of the file
     def validate_weight(self, file_name, weight=512000):
@@ -411,97 +347,35 @@ class StickerEngine:
         bbox = diff.getbbox()
         return im.crop(bbox)
 
-    # ~ return an Pillow image object transformed to params passed
-    def transform_image(self, file_name, size=(512, 512), radius=8):
-        # convert the radius to the size of the image
-        radius = int(size[0] / 100 * radius)
-        # open the image
-        img = Image.open(file_name)
-        # parse the color of the image
-        if img.mode != "RGBA":
-            img = img.convert("RGBA")
-        # get the size of the image
-        width, heigth = img.size
-        # create a correct dimensions
-        value_resize = (size[0], int(heigth * size[0] / width)) if width > heigth else (int(width * size[1] / heigth), size[1])
-        if width < size[0] or heigth < size[0]:
-            img = img.resize(value_resize)
-        # make the thumbnail of the image to conserve the proportions
-        img.thumbnail(size)
-        mask = Image.new("L", img.size, 0)
-        draw = ImageDraw.Draw(mask)
-        draw.rounded_rectangle((0, 0) + img.size, radius=radius, fill=255)
-        img_masked = Image.new("RGBA", size, (0, 0, 0, 0))
-        img_masked.paste(img, mask=mask)
-        img_output = Image.new("RGBA", size, (0, 0, 0, 0))
-        x = int((size[0] - img.size[0]) / 2)
-        y = int((size[1] - img.size[1]) / 2)
-        img_output.paste(img_masked, (x, y))
-        img.close()
-        mask.close()
-        img_masked.close()
-        return img_output
+    def transform_image(self, file_name, size=(512, 512), radius=8, crop_mode="fit"):
+        with Image.open(file_name) as image:
+            return self.transform_image_obj(image, size=size, radius=radius, crop_mode=crop_mode)
 
-    # ~ transform the animated image
-    def transform_gif(self, file_name, dir, save_name):
-        GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_FIRST
-        img = Image.open(file_name)
-        duration = img.info.get("duration", 80)
+    def transform_gif(self, file_name, dir, save_name, crop_mode="fit"):
+        """Read GIF or animated WebP directly, preserving alpha and frame timing."""
         frames = []
-        for frame in range(0, img.n_frames):
-            img.seek(frame)
-            name = os.path.join(dir, f"frame-{frame}.webp")
-            img.save(name)
-            frames.append(self.transform_image(name))
-            try:
-                os.remove(name)
-            except Exception:
-                pass
-        
-        output_file = os.path.join(dir, save_name)
-        frames[0].save(
-            output_file,
-            save_all=True,
-            append_images=frames,
-            transparency=0,
-            loop=0,
-            duration=duration,
-            optimize=True,
-        )
-        img.close()
+        durations = []
+        try:
+            with Image.open(file_name) as image:
+                for index in range(getattr(image, "n_frames", 1)):
+                    if self.cancel_flag:
+                        return
+                    image.seek(index)
+                    frame = image.convert("RGBA")
+                    durations.append(max(1, int(image.info.get("duration", 80))))
+                    frames.append(self.transform_image_obj(frame, crop_mode=crop_mode))
+                    frame.close()
+            output = os.path.join(dir, save_name)
+            frames[0].save(output, save_all=True, append_images=frames[1:],
+                           loop=0, duration=durations, optimize=True)
+            self.apply_adaptive_compression(output, frames, durations[0])
+        finally:
+            for frame in frames:
+                frame.close()
 
-        # Adaptive Compression Guard for < 500 KB Limit
-        if os.path.exists(output_file) and os.path.getsize(output_file) > 500000 and len(frames) > 2:
-            step_frames = frames[::2]
-            step_duration = duration * 2
-            step_frames[0].save(
-                output_file,
-                save_all=True,
-                append_images=step_frames,
-                transparency=0,
-                loop=0,
-                duration=step_duration,
-                optimize=True,
-            )
-            if os.path.getsize(output_file) > 500000:
-                resized_frames = [f.resize((350, 350)) for f in step_frames]
-                resized_frames[0].save(
-                    output_file,
-                    save_all=True,
-                    append_images=resized_frames,
-                    transparency=0,
-                    loop=0,
-                    duration=step_duration,
-                    optimize=True,
-                )
-
-    # ~ transform the webp animated image
-    def transform_webp(self, file_name, directory, destiny, save_name):
-        name_gif = "webp_to_gif.gif"
-        # convert the webp to gif
-        with tempfile.TemporaryDirectory(dir=destiny) as temporary:
-            self.webp_to_gif(os.path.join(directory, file_name), temporary, name_gif)
-            self.transform_gif(os.path.join(temporary, name_gif), destiny, save_name)
+    def transform_webp(self, file_name, directory, destiny, save_name, crop_mode="fit"):
+        self.transform_gif(os.path.join(directory, file_name), destiny, save_name,
+                           crop_mode=crop_mode)
 
     # ~ parse the webp image to gif
     def webp_to_gif(self, file_name, dir, save_name):
