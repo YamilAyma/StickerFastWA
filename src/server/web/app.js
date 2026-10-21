@@ -1,4 +1,5 @@
 "use strict";
+const { t } = window.I18n;
 const $ = (id) => document.getElementById(id);
 const entries = [];
 const allowed = new Set([
@@ -55,7 +56,7 @@ const session = {
   },
 };
 function showMessage(text = "") {
-  $("message").textContent = text;
+  $("message").textContent = t(text);
   $("message").hidden = !text;
 }
 function suffix(file) {
@@ -71,10 +72,11 @@ function bytes(size) {
 }
 function setTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  $("theme").textContent = theme === "dark" ? "Tema claro" : "Tema oscuro";
+  $("theme").textContent =
+    theme === "dark" ? t("Tema claro") : t("Tema oscuro");
   $("theme").setAttribute(
     "aria-label",
-    `Cambiar a tema ${theme === "dark" ? "claro" : "oscuro"}`,
+    t(theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"),
   );
   storage.set("stickerfast-theme", theme);
 }
@@ -99,10 +101,14 @@ function setBusy(value) {
 function updateSummary() {
   const selection = selected();
   $("count").textContent = `${entries.length} / 30`;
-  $("selected-count").textContent =
-    `${selection.length} sticker${selection.length === 1 ? "" : "s"}`;
-  $("selection-summary").textContent =
-    `${selection.length} seleccionados · ${bytes(selection.reduce((sum, entry) => sum + entry.file.size, 0))}`;
+  $("selected-count").textContent = t(
+    selection.length === 1 ? "{count} sticker" : "{count} stickers",
+    { count: selection.length },
+  );
+  $("selection-summary").textContent = t("{count} seleccionados · {size}", {
+    count: selection.length,
+    size: bytes(selection.reduce((sum, entry) => sum + entry.file.size, 0)),
+  });
   $("empty-note").hidden = entries.length > 0;
   $("collection-toolbar").hidden = entries.length === 0;
   $("create").disabled = busy || selection.length === 0;
@@ -128,14 +134,17 @@ function renderFiles() {
       media.loading = "lazy";
     }
     media.addEventListener("error", () => {
-      preview.replaceChildren(document.createTextNode("Sin vista previa"));
+      preview.replaceChildren(document.createTextNode(t("Sin vista previa")));
     });
     preview.append(media);
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "remove-file";
     remove.textContent = "×";
-    remove.setAttribute("aria-label", `Quitar ${entry.file.name}`);
+    remove.setAttribute(
+      "aria-label",
+      t("Quitar {name}", { name: entry.file.name }),
+    );
     remove.addEventListener("click", () => {
       if (busy) return;
       URL.revokeObjectURL(entry.url);
@@ -148,7 +157,10 @@ function renderFiles() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = entry.selected;
-    checkbox.setAttribute("aria-label", `Incluir ${entry.file.name}`);
+    checkbox.setAttribute(
+      "aria-label",
+      t("Incluir {name}", { name: entry.file.name }),
+    );
     checkbox.addEventListener("change", () => {
       entry.selected = checkbox.checked;
       card.classList.toggle("excluded", !entry.selected);
@@ -171,11 +183,13 @@ function addFiles(files) {
   const errors = [];
   for (const file of files) {
     if (!allowed.has(suffix(file))) {
-      errors.push(`${file.name}: formato no admitido.`);
+      errors.push(t("{name}: formato no admitido.", { name: file.name }));
       continue;
     }
     if (!file.size || file.size > 25 * 1024 * 1024) {
-      errors.push(`${file.name}: debe pesar entre 1 byte y 25 MB.`);
+      errors.push(
+        t("{name}: debe pesar entre 1 byte y 25 MB.", { name: file.name }),
+      );
       continue;
     }
     if (
@@ -188,7 +202,7 @@ function addFiles(files) {
     )
       continue;
     if (entries.length >= 30) {
-      errors.push("Puedes añadir hasta 30 archivos.");
+      errors.push(t("Puedes añadir hasta 30 archivos."));
       break;
     }
     entries.push({ file, url: URL.createObjectURL(file), selected: true });
@@ -234,7 +248,7 @@ function clearIcon() {
   iconUrl = null;
   $("icon").value = "";
   $("tray-preview").textContent = "✦";
-  $("icon-label").textContent = "O usaremos el primer sticker.";
+  $("icon-label").textContent = t("O usaremos el primer sticker.");
   $("remove-icon").hidden = true;
 }
 $("remove-icon").addEventListener("click", clearIcon);
@@ -246,7 +260,7 @@ $("icon").addEventListener("change", (event) => {
     !file.size ||
     file.size > 25 * 1024 * 1024
   ) {
-    showMessage("Elige una imagen válida de hasta 25 MB para el icono.");
+    showMessage(t("Elige una imagen válida de hasta 25 MB para el icono."));
     event.target.value = "";
     return;
   }
@@ -264,9 +278,9 @@ async function responseData(response) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = Array.isArray(data.detail)
-      ? data.detail.map((item) => item.msg).join(" ")
-      : data.detail;
-    const error = new Error(detail || "No se pudo completar la solicitud.");
+      ? t("Revisa los datos del formulario.")
+      : t(data.detail);
+    const error = new Error(detail || t("No se pudo completar la solicitud."));
     error.status = response.status;
     throw error;
   }
@@ -286,7 +300,7 @@ function upload(form) {
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable)
         $("job-status").textContent =
-          `Subiendo archivos… ${Math.round((event.loaded / event.total) * 100)} %`;
+          `${t("Subiendo archivos…")} ${Math.round((event.loaded / event.total) * 100)} %`;
     });
     request.onload = () => {
       uploadRequest = null;
@@ -294,7 +308,7 @@ function upload(form) {
       try {
         data = JSON.parse(request.responseText);
       } catch {
-        reject(new Error("Respuesta del servidor no válida."));
+        reject(new Error(t("Respuesta del servidor no válida.")));
         return;
       }
       if (request.status >= 200 && request.status < 300) resolve(data);
@@ -302,20 +316,22 @@ function upload(form) {
         reject(
           new Error(
             Array.isArray(data.detail)
-              ? data.detail.map((item) => item.msg).join(" ")
-              : data.detail || "No se pudo subir el contenido.",
+              ? t("Revisa los datos del formulario.")
+              : t(data.detail) || t("No se pudo subir el contenido."),
           ),
         );
     };
     request.onerror = () => {
       uploadRequest = null;
-      reject(new Error("No se pudo conectar con el servidor local."));
+      reject(new Error(t("No se pudo conectar con el servidor local.")));
     };
     request.ontimeout = () => {
       uploadRequest = null;
       reject(
         new Error(
-          "La carga tardó demasiado. Comprueba el servidor antes de reintentar.",
+          t(
+            "La carga tardó demasiado. Comprueba el servidor antes de reintentar.",
+          ),
         ),
       );
     };
@@ -342,30 +358,33 @@ async function poll() {
     $("job-percentage").textContent = `${job.progress} %`;
     if (job.status === "completed") {
       finishJob(
-        "Tu pack está listo",
-        "Descárgalo e impórtalo en la app elegida.",
+        t("Tu pack está listo"),
+        t("Descárgalo e impórtalo en la app elegida."),
       );
       $("download").href = job.download_url;
       $("download").hidden = false;
     } else if (job.status === "failed") {
       finishJob(
-        "No se pudo crear el pack",
-        job.error || "Revisa tus archivos y vuelve a intentarlo.",
+        t("No se pudo crear el pack"),
+        t(job.error) || t("Revisa tus archivos y vuelve a intentarlo."),
       );
     } else if (job.status === "cancelled") {
       finishJob(
-        "Creación cancelada",
-        "Tu colección sigue aquí. Puedes ajustarla y volver a empezar.",
+        t("Creación cancelada"),
+        t("Tu colección sigue aquí. Puedes ajustarla y volver a empezar."),
       );
     } else {
       $("job-title").textContent =
         job.status === "queued"
-          ? "Tu pack está en cola"
-          : "Creando tus stickers";
+          ? t("Tu pack está en cola")
+          : t("Creando tus stickers");
       $("job-status").textContent =
         job.status === "queued"
-          ? "Esperando un turno de procesamiento…"
-          : `Procesando ${job.current} de ${job.total} archivos…`;
+          ? t("Esperando un turno de procesamiento…")
+          : t("Procesando {current} de {total} archivos…", {
+              current: job.current,
+              total: job.total,
+            });
       $("cancel").disabled = false;
       $("cancel").hidden = false;
       pollTimer = setTimeout(poll, 600);
@@ -374,15 +393,18 @@ async function poll() {
     if (activeJob !== id) return;
     if (error.status === 404) {
       finishJob(
-        "El trabajo ya no está disponible",
-        "El servidor pudo haberse reiniciado o el resultado expiró. Puedes crear otro pack.",
+        t("El trabajo ya no está disponible"),
+        t(
+          "El servidor pudo haberse reiniciado o el resultado expiró. Puedes crear otro pack.",
+        ),
       );
       activeJob = null;
       session.set(null);
       $("delete-job").hidden = true;
     } else {
-      $("job-status").textContent =
-        "No se pudo consultar el progreso. El trabajo puede seguir ejecutándose.";
+      $("job-status").textContent = t(
+        "No se pudo consultar el progreso. El trabajo puede seguir ejecutándose.",
+      );
       $("retry").hidden = false;
       $("cancel").disabled = false;
     }
@@ -397,8 +419,9 @@ $("cancel").addEventListener("click", async () => {
   $("cancel").disabled = true;
   try {
     await api(`/api/jobs/${activeJob}/cancel`, { method: "POST" });
-    $("job-status").textContent =
-      "Cancelando… Esperando a que termine el archivo actual.";
+    $("job-status").textContent = t(
+      "Cancelando… Esperando a que termine el archivo actual.",
+    );
     clearTimeout(pollTimer);
     pollTimer = setTimeout(poll, 500);
   } catch (error) {
@@ -425,7 +448,7 @@ $("pack-form").addEventListener("submit", async (event) => {
   if (busy) return;
   const selection = selected();
   if (!selection.length) {
-    showMessage("Selecciona al menos un archivo.");
+    showMessage(t("Selecciona al menos un archivo."));
     return;
   }
   const name = $("name").value.trim();
@@ -482,8 +505,8 @@ $("pack-form").addEventListener("submit", async (event) => {
   setBusy(true);
   clearTimeout(pollTimer);
   $("job-panel").hidden = false;
-  $("job-title").textContent = "Preparando tu colección";
-  $("job-status").textContent = "Subiendo archivos…";
+  $("job-title").textContent = t("Preparando tu colección");
+  $("job-status").textContent = t("Subiendo archivos…");
   $("progress").value = 0;
   $("job-percentage").textContent = "0 %";
   $("download").hidden = true;
@@ -507,9 +530,10 @@ $("pack-form").addEventListener("submit", async (event) => {
       activeJob = previous;
       await poll();
     } else {
-      $("job-title").textContent = "No se pudo iniciar el trabajo";
-      $("job-status").textContent =
-        "Revisa los archivos y vuelve a intentarlo.";
+      $("job-title").textContent = t("No se pudo iniciar el trabajo");
+      $("job-status").textContent = t(
+        "Revisa tus archivos y vuelve a intentarlo.",
+      );
       $("cancel").hidden = true;
     }
   }
@@ -528,5 +552,19 @@ window.addEventListener("beforeunload", (event) => {
   if (uploadRequest) {
     event.preventDefault();
     event.returnValue = "";
+  }
+});
+
+$("language").value = window.I18n.language;
+$("language").addEventListener("change", () => {
+  window.I18n.setLanguage($("language").value);
+  setTheme(document.documentElement.dataset.theme);
+  renderFiles();
+  setBusy(busy);
+  if (!icon) $("icon-label").textContent = t("O usaremos el primer sticker.");
+  showMessage();
+  if (activeJob) {
+    clearTimeout(pollTimer);
+    poll();
   }
 });

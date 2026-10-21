@@ -6,6 +6,8 @@
     <meta name="color-scheme" content="dark light" />
     <title>StickerFast WA · Crea tu pack</title>
     <link rel="stylesheet" href="/web/style.css" />
+    <script src="/web/locales.js" defer></script>
+    <script src="/web/i18n.js" defer></script>
     <script src="/web/app.js" defer></script>
   </head>
   <body>
@@ -23,6 +25,17 @@
         ><span>StickerFast <strong>WA</strong></span></a
       >
       <div class="header-actions">
+        <label class="language-picker"
+          ><span class="sr-only">Idioma</span
+          ><select id="language" aria-label="Idioma">
+            <option value="es">Español</option>
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+            <option value="de">Deutsch</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Português</option>
+          </select></label
+        >
         <span class="local-badge"><span></span> En tu equipo</span
         ><button
           type="button"
@@ -149,7 +162,7 @@
               />
             </div>
             <label class="field"
-              >Encuadre del video<select id="crop-mode" name="crop_mode">
+              >Encuadre de los stickers<select id="crop-mode" name="crop_mode">
                 <option value="center_crop">Recorte central · 1:1</option>
                 <option value="fit">
                   Original · ajustar con transparencia

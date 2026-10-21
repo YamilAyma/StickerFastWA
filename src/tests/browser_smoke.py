@@ -124,8 +124,38 @@ def run():
                     expect(page.locator('.media-card')).to_have_count(0)
                     page.locator('#theme').click()
                     page.screenshot(path='/tmp/stickerfast-browser/mobile-dark.png', full_page=True)
+                    headings = {
+                        'en': 'Choose your stickers', 'fr': 'Choisissez vos stickers',
+                        'de': 'Wähle deine Sticker', 'it': 'Scegli i tuoi sticker',
+                        'pt': 'Escolha suas figurinhas', 'es': 'Elige tus stickers',
+                    }
+                    page.set_viewport_size({'width': 320, 'height': 844})
+                    for language, heading in headings.items():
+                        page.locator('#language').select_option(language)
+                        expect(page.locator('html')).to_have_attribute('lang', language)
+                        expect(page.locator('#media-title')).to_have_text(heading)
+                        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), language
+                    page.locator('#language').select_option('en')
+                    page.reload()
+                    expect(page.locator('html')).to_have_attribute('lang', 'en')
+                    expect(page.locator('#media-title')).to_have_text('Choose your stickers')
+                    page.locator('#files').set_input_files({'name':'invalid.png', 'mimeType':'image/png', 'buffer':b'invalid'})
+                    page.locator('#name').fill('English pack')
+                    page.locator('#author').fill('Test')
+                    page.locator('#create').click()
+                    expect(page.locator('#message')).to_contain_text('Could not read the file.')
+                    page.locator('#clear').click()
+                    page.locator('#files').set_input_files({'name':'english.png', 'mimeType':'image/png', 'buffer':png('red')})
+                    page.locator('#crop-mode').select_option('fit')
+                    page.locator('#create').click()
+                    expect(page.locator('#job-title')).to_have_text('Your pack is ready', timeout=15000)
+                    expect(page.locator('#download')).to_have_text('Download pack ↓')
+                    page.locator('#language').select_option('fr')
+                    expect(page.locator('#job-title')).to_have_text('Votre pack est prêt')
+                    expect(page.locator('#download')).to_have_text('Télécharger le pack ↓')
+                    page.locator('#delete-job').click()
                     assert not errors, errors
-                    print('PASS: desktop/mobile previews, exclusion, custom icon, both package downloads, theme persistence, reload recovery, removal; no JS errors')
+                    print('PASS: desktop/mobile creation, both formats, six languages, localized errors/status, preferences, reload and polling recovery; no JS errors')
                     context.close()
                 finally:
                     browser.close()

@@ -772,3 +772,45 @@ body.busy .dropzone {
 .intro-note > svg {
   display: block;
 }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.language-picker select {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 8px;
+  font-size: 12px;
+  max-width: 115px;
+}
+@media (max-width: 720px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header-actions {
+    margin-left: auto;
+    gap: 8px;
+  }
+  .header-actions .quiet {
+    padding: 9px;
+    font-size: 11px;
+  }
+  .brand {
+    font-size: 15px;
+  }
+  .language-picker select {
+    font-size: 11px;
+    max-width: 100px;
+  }
+}
