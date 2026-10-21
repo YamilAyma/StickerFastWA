@@ -4,8 +4,8 @@ import sys
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(BASE_DIR, "logic"))
-from sfwa import Sfwa
+sys.path.insert(0, BASE_DIR)
+from logic.sfwa import Sfwa
 
 sfwa = Sfwa()
 

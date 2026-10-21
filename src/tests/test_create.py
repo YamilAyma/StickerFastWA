@@ -1,6 +1,5 @@
 import sys
 import os
-import shutil
 import tempfile
 from PIL import Image
 
@@ -10,7 +9,7 @@ sys.path.append(BASE_DIR)
 from logic.sfwa import Sfwa
 
 
-def run_test():
+def test_create_packs():
     sfwa = Sfwa()
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -57,6 +56,6 @@ def run_test():
 
 
 if __name__ == '__main__':
-    run_test()
+    test_create_packs()
 
  
