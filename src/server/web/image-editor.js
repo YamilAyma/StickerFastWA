@@ -31,12 +31,14 @@ window.StickerEditor = (() => {
     y: 0,
     text: "",
     "text-color": "#ffffff",
+    "font-family": "default",
     font: 40,
     "text-y": 432,
     border: 0,
     "border-color": "#ffffff",
   };
   function sync() {
+    window.StickerFonts.select(values["font-family"]);
     for (const key of Object.keys(values))
       $("editor-" + key).value = values[key];
   }
@@ -72,7 +74,7 @@ window.StickerEditor = (() => {
     ctx.drawImage(layer, 0, 0);
     if (values.text.trim()) {
       const size = Number(values.font);
-      ctx.font = `700 ${size}px Arial, sans-serif`;
+      ctx.font = `700 ${size}px ${window.StickerFonts.family(values["font-family"])}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.lineJoin = "round";
@@ -153,6 +155,7 @@ window.StickerEditor = (() => {
       y: 0,
       text: "",
       "text-color": "#ffffff",
+      "font-family": "default",
       font: 40,
       "text-y": 432,
       border: 0,
@@ -277,12 +280,44 @@ window.StickerEditor = (() => {
       button.addEventListener("click", () => chooseTool(button.dataset.tool)),
     );
   for (const key of Object.keys(values)) {
+    if (key === "font-family") continue;
     $("editor-" + key).addEventListener("input", (event) => {
       values[key] = event.target.value;
       draw();
     });
     $("editor-" + key).addEventListener("change", record);
   }
+  $("editor-font-family").addEventListener("change", async () => {
+    if (!source || saving) return;
+    const token = generation,
+      id = $("editor-font-family").value;
+    saving = true;
+    $("editor-save").disabled = true;
+    $("editor-fields").disabled = true;
+    $("editor-hint").textContent = t("Cargando fuente…");
+    $("editor-error").hidden = true;
+    try {
+      await window.StickerFonts.load(id);
+      if (token !== generation) return;
+      values["font-family"] = id;
+      draw();
+      record();
+    } catch (error) {
+      if (token !== generation) return;
+      window.StickerFonts.select(values["font-family"]);
+      $("editor-error").textContent = t(
+        "No se pudo cargar la fuente. Se mantiene la fuente anterior.",
+      );
+      $("editor-error").hidden = false;
+    } finally {
+      if (token === generation) {
+        saving = false;
+        $("editor-save").disabled = false;
+        $("editor-fields").disabled = false;
+        chooseTool(tool);
+      }
+    }
+  });
   $("editor-rotate").addEventListener("click", () => {
     angle = (angle + 90) % 360;
     draw();

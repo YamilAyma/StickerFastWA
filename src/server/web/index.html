@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/web/style.css" />
     <script src="/web/locales.js" defer></script>
     <script src="/web/i18n.js" defer></script>
+    <script src="/web/font-picker.js" defer></script>
     <script src="/web/image-editor.js" defer></script>
     <script src="/web/collection-inputs.js" defer></script>
     <script src="/web/app.js" defer></script>
@@ -445,6 +446,21 @@
                 maxlength="120"
                 placeholder="Añade una frase"
             /></label>
+            <label class="field"
+              >Buscar fuentes<input
+                id="editor-font-search"
+                type="search"
+                placeholder="Nombre o estilo de fuente"
+                autocomplete="off"
+            /></label>
+            <label class="field"
+              >Fuente de Google Fonts<select id="editor-font-family">
+                <option value="default">Predeterminada (Arial)</option>
+              </select></label
+            >
+            <p class="font-note">
+              Las fuentes se incluyen en la aplicación y funcionan sin Internet.
+            </p>
             <div class="editor-color-row">
               <label class="field"
                 >Color del texto<input

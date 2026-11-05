@@ -1141,3 +1141,4 @@ dialog::backdrop {
   gap: 10px;
   overflow-wrap: anywhere;
 }
+.font-note{font-size:10px;color:var(--muted);margin:0 0 14px}.editor-controls select{max-width:100%}

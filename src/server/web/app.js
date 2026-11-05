@@ -739,6 +739,7 @@ window.addEventListener("beforeunload", (event) => {
 $("language").value = window.I18n.language;
 $("language").addEventListener("change", () => {
   window.I18n.setLanguage($("language").value);
+  window.StickerFonts.refresh();
   setTheme(document.documentElement.dataset.theme);
   renderFiles();
   setBusy(busy);
