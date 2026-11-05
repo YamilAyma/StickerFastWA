@@ -63,7 +63,7 @@ class StickerEngine:
             content.mkdir()
             if package == "wemoji":
                 metadata = {"a": content.name, "b": data.namepack, "c": data.author,
-                            "d": "tray_icon.png", "i": "4", "j": False, "k": bool(data.animated)}
+                            "d": "tray_icon.png", "i": "4", "j": False, "k": any(self.validate_video(str(item)) or self._is_animated(item) for item in directory.iterdir() if item.is_file() and (self.validate_img(str(item)) or self.validate_video(str(item))))}
                 self.open_text_file(content / ".wspdata", "w", metadata, is_json=True)
             else:
                 self.open_text_file(content / "title.txt", "w", data.namepack)
@@ -75,6 +75,9 @@ class StickerEngine:
                                 crop_mode=crop_mode)
             if self.cancel_flag:
                 return False
+            if package == "wemoji":
+                metadata["k"] = any(self._is_animated(item) for item in content.glob("*.webp"))
+                self.open_text_file(content / ".wspdata", "w", metadata, is_json=True)
             with zipfile.ZipFile(archive, "a") as output:
                 for file in sorted(content.iterdir()):
                     name = str(Path(content.name) / file.name) if package == "wemoji" else file.name
@@ -130,14 +133,21 @@ class StickerEngine:
                 break
             source = os.path.join(directory, source_name)
             name = f"{index:02d}-{self.create_name('WS')}.webp"
+            if source.lower().endswith('.webp'):
+                from .animation import validate_sticker
+                if validate_sticker(source)['valid']:
+                    shutil.copyfile(source,os.path.join(destiny,name))
+                    if not conserve_imgs:os.remove(source)
+                    continue
             if self.validate_video(source):
                 if not self.process_video_file(source, destiny, name, crop_mode=crop_mode):
                     raise ValueError("Could not convert video")
-            elif animated:
+            elif self._is_animated(source):
                 self.transform_gif(source, destiny, name, crop_mode=crop_mode)
             else:
                 with self.transform_image(source, crop_mode=crop_mode) as image:
-                    image.save(os.path.join(destiny, name))
+                    from .animation import encode_frames
+                    encode_frames([image], [0], os.path.join(destiny, name))
             if not conserve_imgs and not self.cancel_flag:
                 os.remove(source)
 
@@ -188,57 +198,14 @@ class StickerEngine:
         exts = (".mp4", ".webm", ".mov", ".avi", ".mkv")
         return file_name.lower().endswith(exts)
 
-    # ~ process video file into webp animated sticker with crop_mode
+    @staticmethod
+    def _is_animated(path):
+        with Image.open(path) as image:
+            return getattr(image, 'n_frames', 1) > 1
+
     def process_video_file(self, video_path, dir_destiny, save_name, crop_mode="center_crop"):
-        try:
-            import cv2
-        except ImportError:
-            print("OpenCV (cv2) not installed. Cannot process video.")
-            return False
-
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            print(f"Cannot open video file: {video_path}")
-            return False
-
-        fps = cap.get(cv2.CAP_PROP_FPS) or 24
-        sample_interval = max(1, int(fps / 12))  # Target ~12 FPS
-        frames = []
-        frame_idx = 0
-
-        while True:
-            ret, frame = cap.read()
-            if not ret or len(frames) >= 45:  # Max 3-4 seconds
-                break
-
-            if frame_idx % sample_interval == 0:
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                img_pil = Image.fromarray(frame_rgb)
-                sticker_frame = self.transform_image_obj(img_pil, crop_mode=crop_mode)
-                frames.append(sticker_frame)
-
-            frame_idx += 1
-
-        cap.release()
-
-        if not frames:
-            return False
-
-        output_file = os.path.join(dir_destiny, save_name)
-        duration = int(1000 / 12)  # ~83ms per frame
-
-        frames[0].save(
-            output_file,
-            save_all=True,
-            append_images=frames[1:],
-            transparency=0,
-            loop=0,
-            duration=duration,
-            optimize=True,
-        )
-
-        # Multi-level Adaptive Compression Guard to strictly ensure < 500 KB
-        self.apply_adaptive_compression(output_file, frames, duration)
+        from .animation import render_media
+        render_media(video_path, os.path.join(dir_destiny,save_name),{'crop_mode':crop_mode},cancelled=lambda:self.cancel_flag)
         return True
 
     def apply_adaptive_compression(self, output_file, frames, duration):
@@ -352,26 +319,8 @@ class StickerEngine:
             return self.transform_image_obj(image, size=size, radius=radius, crop_mode=crop_mode)
 
     def transform_gif(self, file_name, dir, save_name, crop_mode="fit"):
-        """Read GIF or animated WebP directly, preserving alpha and frame timing."""
-        frames = []
-        durations = []
-        try:
-            with Image.open(file_name) as image:
-                for index in range(getattr(image, "n_frames", 1)):
-                    if self.cancel_flag:
-                        return
-                    image.seek(index)
-                    frame = image.convert("RGBA")
-                    durations.append(max(1, int(image.info.get("duration", 80))))
-                    frames.append(self.transform_image_obj(frame, crop_mode=crop_mode))
-                    frame.close()
-            output = os.path.join(dir, save_name)
-            frames[0].save(output, save_all=True, append_images=frames[1:],
-                           loop=0, duration=durations, optimize=True)
-            self.apply_adaptive_compression(output, frames, durations[0])
-        finally:
-            for frame in frames:
-                frame.close()
+        from .animation import render_media
+        render_media(file_name,os.path.join(dir,save_name),{'crop_mode':crop_mode},cancelled=lambda:self.cancel_flag)
 
     def transform_webp(self, file_name, directory, destiny, save_name, crop_mode="fit"):
         self.transform_gif(os.path.join(directory, file_name), destiny, save_name,

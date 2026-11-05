@@ -88,7 +88,7 @@ def test_video_uses_the_same_framing(tmp_path, mode):
     source = tmp_path / 'wide.avi'
     writer = cv2.VideoWriter(str(source), cv2.VideoWriter_fourcc(*'MJPG'), 12, (200, 100))
     assert writer.isOpened()
-    for index in range(4):
+    for index in range(12):
         frame = np.zeros((100, 200, 3), dtype=np.uint8)
         frame[:] = (0, 0, 255)
         frame[:, 50:150] = (index * 20, 255, 0)

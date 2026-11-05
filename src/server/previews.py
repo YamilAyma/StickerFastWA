@@ -15,14 +15,20 @@ def describe_stickers(archive_path: Path) -> list[dict]:
             content = archive.read(entry)
             with Image.open(BytesIO(content)) as image:
                 duration = 0
+                issues = []
                 frames = getattr(image, 'n_frames', 1)
                 for frame in range(frames):
                     image.seek(frame)
                     image.load()
-                    duration += image.info.get('duration', 0) if frames > 1 else 0
+                    delay=image.info.get('duration',0)
+                    duration += delay if frames>1 else 0
+                    if frames>1 and delay<8:issues.append('Los cuadros deben durar al menos 8 ms.')
+                if image.size!=(512,512):issues.append('Las dimensiones deben ser 512 × 512.')
+                if len(content)>(500000 if frames>1 else 100000):issues.append('El sticker supera el peso permitido.')
+                if duration>10000:issues.append('La animación supera los 10 segundos.')
                 stickers.append(dict(index=len(stickers), width=image.width,
                                      height=image.height, bytes=len(content),
-                                     frames=frames, duration_ms=duration))
+                                     frames=frames, duration_ms=duration, validation=dict(valid=not issues, issues=list(dict.fromkeys(issues)))))
     return stickers
 
 

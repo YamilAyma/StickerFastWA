@@ -24,6 +24,8 @@ from logic.engine import StickerEngine
 from server.previews import describe_stickers, read_sticker
 from server.imports import import_router
 from server.background import background_router
+from server.animations import animation_router
+from logic.animation import media_info, clip_bounds, validate_sticker
 
 MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_JOB_BYTES = 250 * 1024 * 1024
@@ -41,9 +43,9 @@ class UploadLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope['type'] != 'http' or scope['path'] not in {'/api/jobs', '/api/imports', '/api/remove-background'} or scope['method'] != 'POST':
+        if scope['type'] != 'http' or scope['path'] not in {'/api/jobs', '/api/imports', '/api/remove-background', '/api/animations'} or scope['method'] != 'POST':
             return await self.app(scope, receive, send)
-        limit = ({'/api/imports': 100 * 1024 * 1024, '/api/remove-background': 25 * 1024 * 1024}.get(scope['path'], MAX_JOB_BYTES)) + 1024 * 1024  # Allow multipart metadata overhead.
+        limit = ({'/api/imports': 100 * 1024 * 1024, '/api/remove-background': 25 * 1024 * 1024, '/api/animations':25 * 1024 * 1024}.get(scope['path'], MAX_JOB_BYTES)) + 1024 * 1024  # Allow multipart metadata overhead.
         headers = dict(scope['headers'])
         try:
             length = int(headers.get(b'content-length', b'0'))
@@ -79,6 +81,7 @@ class Job:
     stickers: list[dict] = field(default_factory=list)
     packs: list[dict] = field(default_factory=list)
     future: object = None
+    warnings: list[str] = field(default_factory=list)
 
 
 def validate_name(value: str) -> str:
@@ -93,7 +96,7 @@ def validate_name(value: str) -> str:
 def validate_media(path: Path, animated: bool, icon: bool = False):
     try:
         if path.suffix in VIDEO_EXTENSIONS:
-            if icon or not animated:
+            if icon:
                 raise ValueError('Los videos requieren modo animado y no pueden usarse como icono.')
             import cv2
             capture = cv2.VideoCapture(str(path))
@@ -107,11 +110,11 @@ def validate_media(path: Path, animated: bool, icon: bool = False):
             with Image.open(path) as image:
                 if image.width * image.height > 25_000_000:
                     raise ValueError('Imagen demasiado grande (máximo 25 megapíxeles).')
-                if not icon and animated and path.suffix not in {'.gif', '.webp'}:
-                    raise ValueError('El modo animado admite GIF, WebP y videos.')
-                if not icon and not animated and getattr(image, 'n_frames', 1) > 1:
-                    raise ValueError('Activa el modo animado para archivos animados.')
                 image.verify()
+        if not icon:
+            info=media_info(path)
+            clip_bounds(info)
+            return info
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
     except (OSError, Image.DecompressionBombError) as error:
@@ -138,6 +141,7 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
     web_dir = Path(__file__).resolve().parent / 'web'
     app.include_router(import_router(root))
     app.include_router(background_router())
+    app.include_router(animation_router(root))
     app.mount('/web', StaticFiles(directory=web_dir), name='web')
     app.add_middleware(UploadLimitMiddleware)
     hosts = []
@@ -182,7 +186,7 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
                 for index, pack in enumerate(job.packs)]
 
     def job_data(job):
-        return dict(id=job.id, status=job.status, current=job.current, total=job.total,
+        return dict(id=job.id, warnings=job.warnings, status=job.status, current=job.current, total=job.total,
                     progress=100 if job.status == 'completed' else min(99, int(job.current / max(1, job.total) * 100)),
                     error=job.error, packs=pack_data(job),
                     preview_url=f'/api/jobs/{job.id}/stickers' if job.stickers else None,
@@ -196,7 +200,7 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
                     return
                 job.status = 'running'
             inputs = Path(options['directory'])
-            sources = sorted(path for path in inputs.iterdir() if path.is_file())
+            sources = [inputs/name for name in options.get('source_order', sorted(path.name for path in inputs.iterdir() if path.is_file()))]
             offset = 0
             extension = 'wastickers' if options['package'] == 'stickerMaker' else 'wemojipack'
             for index, pack in enumerate(job.packs):
@@ -225,6 +229,10 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
                     if output.testzip() is not None or sum(n.endswith('.webp') for n in output.namelist()) != pack['total']:
                         raise RuntimeError('Incomplete pack')
                 stickers = describe_stickers(archive)
+                if options.get('strict_whatsapp') and len({item['frames']>1 for item in stickers})>1:
+                    raise ValueError('El resultado mezcla tipos de sticker. Procesa las animaciones antes de usar la exportación estricta.')
+                if any(not item['validation']['valid'] for item in stickers):
+                    raise RuntimeError('Invalid sticker dimensions, timing or size')
                 destination = job.directory / archive.name
                 archive.replace(destination)
                 with lock:
@@ -243,9 +251,9 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
                         for pack in job.packs:
                             bundle.write(pack['result'], arcname=pack['result'].name)
                     result = destination
-        except Exception:
+        except Exception as error:
             with lock:
-                job.error = 'No se pudo convertir el contenido del paquete.'
+                job.error = str(error) if isinstance(error, ValueError) else 'No se pudo convertir el contenido del paquete.'
         finally:
             shutil.rmtree(job.directory / 'inputs', ignore_errors=True)
             (job.directory / 'icon.png').unlink(missing_ok=True)
@@ -277,7 +285,8 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
         name: Annotated[str, Form()],
         author: Annotated[str, Form(min_length=1, max_length=80)],
         package: Annotated[Literal['stickerMaker', 'wemoji'], Form()] = 'stickerMaker',
-        animated: Annotated[bool, Form()] = False,
+        animated: Annotated[bool, Form()] = True,
+        strict_whatsapp: Annotated[bool, Form()] = False,
         crop_mode: Annotated[Literal['center_crop', 'fit'], Form()] = 'center_crop',
         icon: Annotated[UploadFile | None, File()] = None,
     ):
@@ -298,6 +307,7 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
             job = Job(job_id, directory, engine=engine_factory(), total=len(files), status='uploading')
             jobs[job_id] = job
         total_bytes = 0
+        media_types = {}
 
         async def save(upload, destination):
             nonlocal total_bytes
@@ -319,7 +329,8 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
                     raise HTTPException(422, 'Formato no admitido.')
                 target = inputs / f'{index:04d}{suffix}'
                 await save(upload, target)
-                await asyncio.to_thread(validate_media, target, animated)
+                info = await asyncio.to_thread(validate_media, target, animated)
+                media_types[target.name] = info['animated']
             icon_path = directory / 'icon.png'
             if icon:
                 suffix = Path(icon.filename or '').suffix.lower()
@@ -347,12 +358,28 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
                     with Image.open(first) as image:
                         image.convert('RGBA').save(icon_path)
             options = dict(package=package, animated=animated, namepack=name, author=author.strip(),
-                           directory=str(inputs), icon=str(icon_path), conserve=True, crop_mode=crop_mode)
+                           directory=str(inputs), icon=str(icon_path), conserve=True, crop_mode=crop_mode, strict_whatsapp=strict_whatsapp)
+            groups = [list(media_types)]
+            if strict_whatsapp:
+                groups = [[file for file, kind in media_types.items() if kind == animated_kind] for animated_kind in (False, True)]
+                groups = [group for group in groups if group]
+                if any(len(group)<3 for group in groups):
+                    raise HTTPException(422,'WhatsApp requiere al menos 3 stickers de cada tipo para separarlos en paquetes.')
+            options['source_order']=[file for group in groups for file in group]
+            sizes=[]
+            for group in groups:
+                parts=(len(group)+29)//30
+                counts=[min(30,len(group)-index*30) for index in range(parts)]
+                if strict_whatsapp and len(counts)>1 and counts[-1]<3:
+                    delta=3-counts[-1];counts[-2]-=delta;counts[-1]=3
+                sizes.extend(counts)
             with lock:
-                parts = (len(files) + 29) // 30
-                job.packs = [dict(name=name if parts == 1 else f'{name[:68]} ({index + 1}-{parts})',
-                                  total=min(30, len(files) - index * 30), status='queued', result=None)
-                             for index in range(parts)]
+                parts=len(sizes)
+                job.packs = [dict(name=name if parts==1 else f'{name[:68]} ({index+1}-{parts})',total=count,status='queued',result=None) for index,count in enumerate(sizes)]
+                if not strict_whatsapp and len(set(media_types.values()))>1:
+                    job.warnings.append('El paquete mixto no cumple la especificación de WhatsApp. Usa la opción de separar por tipo para WhatsApp.')
+                if any(size<3 for size in sizes):
+                    job.warnings.append('WhatsApp requiere al menos 3 stickers por paquete.')
                 job.status = 'queued'
                 job.future = pool.submit(run, job, options)
             return {'id': job.id, 'status_url': f'/api/jobs/{job.id}'}

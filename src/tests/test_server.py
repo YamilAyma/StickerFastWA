@@ -113,7 +113,7 @@ def test_animated_input(tmp_path, extension):
         source = tmp_path / 'video.avi'
         writer = cv2.VideoWriter(str(source), cv2.VideoWriter_fourcc(*'MJPG'), 12, (64, 64))
         assert writer.isOpened()
-        for index in range(8):
+        for index in range(12):
             frame = np.zeros((64, 64, 3), dtype=np.uint8)
             frame[:, index * 4:index * 4 + 8] = (20, 200, 50)
             writer.write(frame)
