@@ -376,7 +376,12 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
             with lock:
                 parts=len(sizes)
                 job.packs = [dict(name=name if parts==1 else f'{name[:68]} ({index+1}-{parts})',total=count,status='queued',result=None) for index,count in enumerate(sizes)]
-                if not strict_whatsapp and len(set(media_types.values()))>1:
+                cursor=0
+                mixed=False
+                for size in sizes:
+                    mixed = mixed or len({media_types[file] for file in options['source_order'][cursor:cursor+size]})>1
+                    cursor+=size
+                if mixed:
                     job.warnings.append('El paquete mixto no cumple la especificación de WhatsApp. Usa la opción de separar por tipo para WhatsApp.')
                 if any(size<3 for size in sizes):
                     job.warnings.append('WhatsApp requiere al menos 3 stickers por paquete.')

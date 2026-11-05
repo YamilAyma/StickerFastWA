@@ -269,3 +269,16 @@ def test_high_fps_gif_is_bounded_before_decoding(tmp_path):
     finally:
         for image in output:
             image.close()
+
+
+def test_default_already_homogeneous_parts_have_no_mixed_warning(tmp_path):
+    files = [("files", (f"{index}.png", picture())) for index in range(30)]
+    files += [("files", (f"{index}.gif", gif())) for index in range(3)]
+    with TestClient(create_app(tmp_path)) as client:
+        response = client.post(
+            "/api/jobs", data={"name": "Compatible", "author": "Test"}, files=files
+        )
+        job = wait_for_job(client, response.json()["id"])
+        assert job["status"] == "completed"
+        assert [pack["total"] for pack in job["packs"]] == [30, 3]
+        assert not job["warnings"]
