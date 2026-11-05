@@ -10,6 +10,8 @@ import shutil
 import tempfile
 import time
 import uuid
+import os
+import ipaddress
 import zipfile
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -115,7 +117,7 @@ def validate_media(path: Path, animated: bool, icon: bool = False):
         raise HTTPException(422, 'No se pudo leer el archivo. Comprueba que sea una imagen o un video válido.') from error
 
 
-def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) -> FastAPI:
+def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, lan_hosts=()) -> FastAPI:
     jobs: dict[str, Job] = {}
     lock = Lock()
     pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='sticker-job')
@@ -136,7 +138,20 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
     app.include_router(import_router(root))
     app.mount('/web', StaticFiles(directory=web_dir), name='web')
     app.add_middleware(UploadLimitMiddleware)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]', 'testserver'])
+    hosts = []
+    for host in lan_hosts:
+        address = ipaddress.IPv4Address(host)
+        if not address.is_private or address.is_unspecified or address.is_multicast or address.is_loopback:
+            raise ValueError('LAN hosts must be private interface addresses')
+        hosts.append(str(address))
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]', 'testserver', *hosts])
+
+    @app.get('/api/launch-info')
+    def launch_info(request: Request):
+        port = request.url.port or 80
+        return {'app': 'StickerFastWA', 'lan': bool(hosts),
+                'urls': [f'http://{host}:{port}' for host in hosts]}
+
 
     @app.middleware('http')
     async def local_origin(request: Request, call_next):
@@ -441,4 +456,4 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
     return app
 
 
-app = create_app()
+app = create_app(lan_hosts=tuple(filter(None, os.environ.get('STICKERFAST_LAN_HOSTS', '').split(','))))
