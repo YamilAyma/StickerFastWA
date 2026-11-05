@@ -252,3 +252,20 @@ def test_failed_background_render_can_retry(tmp_path, monkeypatch):
             client.post(base + "/render", json={"remove_bg": True}).status_code == 503
         )
         assert client.post(base + "/render", json={}).status_code == 200
+
+
+def test_high_fps_gif_is_bounded_before_decoding(tmp_path):
+    from logic.animation import media_info, read_clip
+
+    path = tmp_path / "fast.gif"
+    frames = [Image.new("RGB", (8, 8), (index * 2, 17, 50)) for index in range(121)]
+    frames[0].save(path, save_all=True, append_images=frames[1:], duration=10)
+    info = media_info(path)
+    output, durations = read_clip(path, info, 0, info["duration"])
+    try:
+        assert len(output) == 120
+        assert sum(durations) == 1210
+        assert min(durations) >= 8
+    finally:
+        for image in output:
+            image.close()

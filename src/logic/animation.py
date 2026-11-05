@@ -2,7 +2,6 @@
 
 from pathlib import Path
 import math
-import json
 from PIL import Image, ImageDraw, ImageFont
 
 MAX_SECONDS = 10
@@ -156,21 +155,29 @@ def read_clip(path, info, start, end, cancelled=lambda: False):
             if not info["animated"]:
                 return [image.convert("RGBA")], [0]
             elapsed = 0
+            windows = []
             for index, duration in enumerate(info["durations"]):
-                if cancelled():
-                    raise InterruptedError("Cancelled")
                 left, right = max(elapsed, round(start * 1000)), min(
                     elapsed + duration, round(end * 1000)
                 )
                 if right > left:
-                    image.seek(index)
-                    frame = image.convert("RGBA")
-                    frame.thumbnail((768, 768))
-                    frames.append(frame)
-                    durations.append(right - left)
+                    windows.append((index, right - left))
                 elapsed += duration
                 if elapsed >= end * 1000:
                     break
+            # Select before decoding so a high-FPS GIF never allocates thousands of RGBA frames.
+            count = min(MAX_FRAMES, len(windows))
+            for index in range(count):
+                if cancelled():
+                    raise InterruptedError("Cancelled")
+                group = windows[
+                    index * len(windows) // count : (index + 1) * len(windows) // count
+                ]
+                image.seek(group[0][0])
+                frame = image.convert("RGBA")
+                frame.thumbnail((768, 768))
+                frames.append(frame)
+                durations.append(sum(delay for _, delay in group))
     cleaned, timing, carry = [], [], 0
     for frame, delay in zip(frames, durations):
         if delay < 8 and not timing and carry + delay >= 8:
