@@ -9,6 +9,7 @@
     <script src="/web/locales.js" defer></script>
     <script src="/web/i18n.js" defer></script>
     <script src="/web/image-editor.js" defer></script>
+    <script src="/web/collection-inputs.js" defer></script>
     <script src="/web/app.js" defer></script>
   </head>
   <body>
@@ -78,7 +79,7 @@
               <p class="step">01 / TU COLECCIÓN</p>
               <h2 id="media-title">Elige tus stickers</h2>
             </div>
-            <span class="count" id="count">0 / 30</span>
+            <span class="count" id="count">0 / 300</span>
           </div>
           <div id="dropzone" class="dropzone">
             <span class="upload-icon" aria-hidden="true">↑</span>
@@ -89,14 +90,33 @@
                 id="files"
                 type="file"
                 multiple
-                accept=".png,.jpg,.jpeg,.webp,.gif,.mp4,.webm,.mov,.avi,.mkv"
+                accept=".zip,.png,.jpg,.jpeg,.webp,.gif,.mp4,.webm,.mov,.avi,.mkv"
             /></label>
             <small
-              >Hasta 30 stickers · 25 MB por archivo · 100 MB en total</small
+              >Hasta 300 archivos · 30 stickers por paquete · 250 MB por
+              colección</small
             >
+            <small>ZIP de hasta 100 MB · Imágenes, GIF y videos</small>
           </div>
+          <p
+            id="import-status"
+            class="collection-status"
+            role="status"
+            hidden
+          ></p>
           <div class="collection-toolbar" id="collection-toolbar" hidden>
-            <p id="selection-summary"></p>
+            <div>
+              <p id="selection-summary"></p>
+              <p id="split-summary"></p>
+            </div>
+            <label class="sort-label"
+              ><span class="sr-only">Ordenar archivos</span
+              ><select id="sort-files" aria-label="Ordenar archivos">
+                <option value="manual">Orden manual</option>
+                <option value="name">Nombre A–Z</option>
+                <option value="reverse">Nombre Z–A</option>
+              </select></label
+            >
             <button type="button" id="clear" class="text-button">
               Vaciar colección
             </button>
@@ -272,6 +292,27 @@
           Volver a consultar
         </button>
         <div id="result-grid" class="media-grid"></div>
+      </section>
+      <section
+        id="queue-panel"
+        class="panel queue-panel"
+        aria-labelledby="queue-title"
+      >
+        <div class="section-heading">
+          <div>
+            <p class="step">TUS COLECCIONES</p>
+            <h2 id="queue-title">Cola de generación</h2>
+          </div>
+          <button type="button" id="queue-refresh" class="quiet">
+            Actualizar cola
+          </button>
+        </div>
+        <p id="queue-message" role="status"></p>
+        <div id="queue-list"></div>
+        <p class="queue-note">
+          Puedes preparar otra colección mientras se procesa la anterior. La
+          cola se conserva hasta reiniciar el servidor.
+        </p>
       </section>
       <footer>
         <span>StickerFast WA</span

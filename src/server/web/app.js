@@ -19,6 +19,11 @@ let icon = null;
 let iconUrl = null;
 let activeJob = null;
 let busy = false;
+let uploading = false;
+let importBusy = false;
+let dragEntry = null;
+let queueTimer = null;
+let queueGeneration = 0;
 let pollTimer = null;
 let uploadRequest = null;
 let resultJob = null;
@@ -91,18 +96,20 @@ $("theme").addEventListener("click", () =>
 $("author").value = storage.get("stickerfast-author") || "";
 
 function setBusy(value) {
+  value = value || uploading || importBusy;
   busy = value;
   document.body.classList.toggle("busy", value);
   $("settings-fields").disabled = value;
   $("files").disabled = value;
   $("clear").disabled = value;
+  $("sort-files").disabled = value;
   for (const control of $("media-grid").querySelectorAll("input, button"))
     control.disabled = value;
   updateSummary();
 }
 function updateSummary() {
   const selection = selected();
-  $("count").textContent = `${entries.length} / 30`;
+  $("count").textContent = `${entries.length} / 300`;
   $("selected-count").textContent = t(
     selection.length === 1 ? "{count} sticker" : "{count} stickers",
     { count: selection.length },
@@ -111,21 +118,60 @@ function updateSummary() {
     count: selection.length,
     size: bytes(selection.reduce((sum, entry) => sum + entry.file.size, 0)),
   });
+  $("split-summary").textContent = t(
+    "{count} paquetes · hasta 30 stickers por paquete",
+    { count: Math.ceil(selection.length / 30) },
+  );
   $("empty-note").hidden = entries.length > 0;
   $("collection-toolbar").hidden = entries.length === 0;
   $("create").disabled = busy || selection.length === 0;
 }
 function renderFiles() {
   $("media-grid").replaceChildren();
+  let selectedPosition = 0;
   for (const entry of entries) {
     const card = document.createElement("article");
     card.className = `media-card${entry.selected ? "" : " excluded"}`;
+    card.draggable = !busy;
+    card.addEventListener("dragstart", (event) => {
+      if (busy) {
+        event.preventDefault();
+        return;
+      }
+      dragEntry = entry;
+      event.dataTransfer.setData("text/plain", "sticker-reorder");
+      event.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragover", (event) => {
+      if (dragEntry && !busy) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    });
+    card.addEventListener("drop", (event) => {
+      if (!dragEntry || busy) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const from = entries.indexOf(dragEntry),
+        to = entries.indexOf(entry);
+      if (from >= 0 && to >= 0 && from !== to) {
+        entries.splice(from, 1);
+        entries.splice(to, 0, dragEntry);
+        $("sort-files").value = "manual";
+        renderFiles();
+      }
+      dragEntry = null;
+    });
+    card.addEventListener("dragend", () => {
+      dragEntry = null;
+    });
     const preview = document.createElement("div");
     preview.className = "preview";
     const media = document.createElement(
       videos.has(suffix(entry.file)) ? "video" : "img",
     );
     media.src = entry.url;
+    media.draggable = false;
     if (media.tagName === "VIDEO") {
       media.muted = true;
       media.playsInline = true;
@@ -175,6 +221,45 @@ function renderFiles() {
     const info = document.createElement("small");
     info.textContent = `${suffix(entry.file).toUpperCase()} · ${bytes(entry.file.size)}`;
     meta.append(label, info);
+    if (entry.selected) {
+      selectedPosition++;
+      const position = document.createElement("small");
+      position.textContent = t("#{position} · Paquete {number}", {
+        position: selectedPosition,
+        number: Math.ceil(selectedPosition / 30),
+      });
+      meta.append(position);
+    }
+    const order = document.createElement("div");
+    order.className = "order-actions";
+    for (const [step, label] of [
+      [-1, "Subir {name}"],
+      [1, "Bajar {name}"],
+    ]) {
+      const move = document.createElement("button");
+      move.type = "button";
+      move.className = "quiet";
+      move.textContent = step < 0 ? "↑" : "↓";
+      move.setAttribute("aria-label", t(label, { name: entry.file.name }));
+      move.disabled =
+        busy ||
+        entries.indexOf(entry) + step < 0 ||
+        entries.indexOf(entry) + step >= entries.length;
+      move.addEventListener("click", () => {
+        if (busy) return;
+        const at = entries.indexOf(entry),
+          target = at + step;
+        if (target < 0 || target >= entries.length) return;
+        [entries[at], entries[target]] = [entries[target], entries[at]];
+        $("sort-files").value = "manual";
+        renderFiles();
+        const buttons = $("media-grid").querySelectorAll(
+          ".order-actions button",
+        );
+        buttons[target * 2 + (step < 0 ? 0 : 1)]?.focus();
+      });
+      order.append(move);
+    }
     const actions = document.createElement("div");
     actions.className = "card-actions";
     if (!videos.has(suffix(entry.file)) && suffix(entry.file) !== "gif") {
@@ -217,15 +302,34 @@ function renderFiles() {
       });
       actions.append(restore);
     }
-    card.append(preview, remove, meta, actions);
+    card.append(preview, remove, meta, order, actions);
     $("media-grid").append(card);
   }
   updateSummary();
 }
-function addFiles(files) {
+async function addFiles(incoming) {
   if (busy) return;
+  const incomingFiles = Array.from(incoming);
   const errors = [];
-  for (const file of files) {
+  let files;
+  importBusy = true;
+  $("import-status").textContent = t("Importando archivos…");
+  $("import-status").hidden = !incomingFiles.some((file) =>
+    /\.zip$/i.test(file.name),
+  );
+  setBusy(true);
+  try {
+    files = await window.CollectionInputs.expand(incomingFiles, api, entries);
+  } catch (error) {
+    showMessage(error.message);
+    return;
+  } finally {
+    importBusy = false;
+    $("import-status").hidden = true;
+    setBusy(false);
+  }
+  errors.push(...files.warnings);
+  for (const file of files.files) {
     if (!allowed.has(suffix(file))) {
       errors.push(t("{name}: formato no admitido.", { name: file.name }));
       continue;
@@ -245,8 +349,15 @@ function addFiles(files) {
       )
     )
       continue;
-    if (entries.length >= 30) {
-      errors.push(t("Puedes añadir hasta 30 archivos."));
+    if (entries.length >= 300) {
+      errors.push(t("Puedes añadir hasta 300 archivos."));
+      break;
+    }
+    if (
+      entries.reduce((sum, entry) => sum + entry.file.size, 0) + file.size >
+      250 * 1024 * 1024
+    ) {
+      errors.push(t("La colección supera los 250 MB."));
       break;
     }
     entries.push({ file, url: URL.createObjectURL(file), selected: true });
@@ -258,6 +369,14 @@ function addFiles(files) {
   )
     $("animated").checked = true;
   showMessage(errors.join(" "));
+  const direction = $("sort-files").value;
+  if (direction !== "manual")
+    entries.sort(
+      (a, b) =>
+        a.file.name.localeCompare(b.file.name, window.I18n.language, {
+          numeric: true,
+        }) * (direction === "reverse" ? -1 : 1),
+    );
   renderFiles();
 }
 $("files").addEventListener("change", (event) => {
@@ -332,7 +451,10 @@ async function responseData(response) {
 }
 async function api(url, options) {
   return responseData(
-    await fetch(url, { ...options, signal: AbortSignal.timeout(15000) }),
+    await fetch(url, {
+      ...options,
+      signal: options?.signal || AbortSignal.timeout(15000),
+    }),
   );
 }
 function upload(form) {
@@ -402,8 +524,15 @@ async function poll() {
     $("job-percentage").textContent = `${job.progress} %`;
     if (job.status === "completed") {
       finishJob(
-        t("Tu pack está listo"),
+        t(
+          job.packs?.length > 1
+            ? "Tu colección está lista"
+            : "Tu pack está listo",
+        ),
         t("Descárgalo e impórtalo en la app elegida."),
+      );
+      $("download").textContent = t(
+        job.packs?.length > 1 ? "Descargar colección ZIP" : "Descargar pack ↓",
       );
       $("download").href = job.download_url;
       $("download").hidden = false;
@@ -485,6 +614,7 @@ $("delete-job").addEventListener("click", async () => {
     session.set(null);
     $("job-panel").hidden = true;
     clearResults();
+    refreshQueue();
     showMessage();
   } catch (error) {
     showMessage(error.message);
@@ -519,9 +649,9 @@ $("pack-form").addEventListener("submit", async (event) => {
   }
   if (
     selection.reduce((sum, entry) => sum + entry.file.size, icon?.size || 0) >
-    100 * 1024 * 1024
+    250 * 1024 * 1024
   ) {
-    showMessage("Los archivos seleccionados y el icono superan los 100 MB.");
+    showMessage("La colección supera los 250 MB.");
     return;
   }
   const animated = $("animated").checked;
@@ -549,6 +679,7 @@ $("pack-form").addEventListener("submit", async (event) => {
   form.append("animated", String(animated));
   form.append("crop_mode", $("crop-mode").value);
   if (icon) form.append("icon", icon);
+  uploading = true;
   setBusy(true);
   clearTimeout(pollTimer);
   $("job-panel").hidden = false;
@@ -564,15 +695,18 @@ $("pack-form").addEventListener("submit", async (event) => {
   $("job-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
   try {
     const job = await upload(form);
+    uploading = false;
+    setBusy(false);
     clearResults();
     activeJob = job.id;
     session.set(activeJob);
     storage.set("stickerfast-author", author);
-    if (previous)
-      api(`/api/jobs/${previous}`, { method: "DELETE" }).catch(() => {});
+
+    refreshQueue();
     await poll();
   } catch (error) {
     showMessage(error.message);
+    uploading = false;
     setBusy(false);
     if (previous) {
       activeJob = previous;
@@ -589,7 +723,6 @@ $("pack-form").addEventListener("submit", async (event) => {
 activeJob = session.get();
 if (activeJob && /^[a-f0-9]{32}$/.test(activeJob)) {
   $("job-panel").hidden = false;
-  setBusy(true);
   poll();
 } else {
   activeJob = null;
@@ -597,7 +730,7 @@ if (activeJob && /^[a-f0-9]{32}$/.test(activeJob)) {
   updateSummary();
 }
 window.addEventListener("beforeunload", (event) => {
-  if (uploadRequest) {
+  if (uploadRequest || importBusy) {
     event.preventDefault();
     event.returnValue = "";
   }
@@ -673,6 +806,14 @@ async function loadResults(id, url, force = false) {
       label.textContent = title;
       const info = document.createElement("small");
       info.textContent = stickerDetail(sticker);
+      if (
+        sticker.pack_name &&
+        manifest.stickers.some((item) => item.pack_index > 0)
+      ) {
+        const packLabel = document.createElement("small");
+        packLabel.textContent = sticker.pack_name;
+        meta.append(packLabel);
+      }
       meta.append(label, info);
       card.append(button, meta);
       $("result-grid").append(card);
@@ -691,3 +832,118 @@ $("result-retry").addEventListener("click", () => {
     loadResults(activeJob, `/api/jobs/${activeJob}/stickers`, true);
 });
 $("close-result").addEventListener("click", () => $("result-dialog").close());
+
+$("sort-files").addEventListener("change", () => {
+  if (busy) return;
+  const direction = $("sort-files").value;
+  if (direction !== "manual")
+    entries.sort(
+      (a, b) =>
+        a.file.name.localeCompare(b.file.name, window.I18n.language, {
+          numeric: true,
+        }) * (direction === "reverse" ? -1 : 1),
+    );
+  renderFiles();
+});
+async function refreshQueue(force = false) {
+  const generation = ++queueGeneration;
+  clearTimeout(queueTimer);
+  try {
+    const data = await api("/api/jobs");
+    if (generation !== queueGeneration) return;
+    const list = $("queue-list");
+    if (!force && list.contains(document.activeElement)) return;
+    list.replaceChildren();
+    $("queue-message").textContent = data.jobs.length
+      ? ""
+      : t("Todavía no hay colecciones en la cola.");
+    const labels = {
+      uploading: "Subiendo archivos…",
+      queued: "En espera",
+      running: "Procesando",
+      completed: "Completado",
+      failed: "Fallido",
+      cancelled: "Cancelado",
+      skipped: "Omitido",
+    };
+    for (const job of data.jobs) {
+      const row = document.createElement("article");
+      row.className = "queue-row";
+      const title = document.createElement("strong");
+      title.textContent = job.packs[0]?.name || t("Subiendo archivos…");
+      const detail = document.createElement("p");
+      detail.textContent = `${t(labels[job.status] || job.status)} · ${job.current}/${job.total} · ${job.progress} %`;
+      const actions = document.createElement("div");
+      actions.className = "queue-actions";
+      const view = document.createElement("button");
+      view.type = "button";
+      view.className = "quiet";
+      view.textContent = t("Ver estado");
+      view.addEventListener("click", () => {
+        if (busy) return;
+        clearTimeout(pollTimer);
+        clearResults();
+        activeJob = job.id;
+        session.set(job.id);
+        $("job-panel").hidden = false;
+        $("download").hidden = true;
+        $("delete-job").hidden = true;
+        $("cancel").hidden = false;
+        $("cancel").disabled = false;
+        poll();
+      });
+      actions.append(view);
+      const terminal = ["completed", "failed", "cancelled"].includes(
+        job.status,
+      );
+      const control = document.createElement("button");
+      control.type = "button";
+      control.className = "quiet";
+      control.textContent = t(terminal ? "Eliminar resultado" : "Cancelar");
+      control.disabled = job.status === "uploading";
+      control.addEventListener("click", async () => {
+        try {
+          await api(`/api/jobs/${job.id}${terminal ? "" : "/cancel"}`, {
+            method: terminal ? "DELETE" : "POST",
+          });
+          if (terminal && activeJob === job.id) {
+            activeJob = null;
+            session.set(null);
+            clearResults();
+            $("job-panel").hidden = true;
+          }
+          refreshQueue(true);
+        } catch (error) {
+          showMessage(error.message);
+        }
+      });
+      actions.append(control);
+      if (job.download_url) {
+        const download = document.createElement("a");
+        download.className = "button secondary";
+        download.href = job.download_url;
+        download.textContent = t(
+          job.packs.length > 1 ? "Descargar colección ZIP" : "Descargar pack ↓",
+        );
+        actions.append(download);
+      }
+      const packs = document.createElement("div");
+      packs.className = "queue-packs";
+      for (const pack of job.packs) {
+        const item = document.createElement(pack.download_url ? "a" : "span");
+        item.textContent = `${pack.name} · ${pack.total} · ${t(labels[pack.status] || pack.status)}`;
+        if (pack.download_url) item.href = pack.download_url;
+        packs.append(item);
+      }
+      row.append(title, detail, actions, packs);
+      list.append(row);
+    }
+  } catch (error) {
+    $("queue-message").textContent = t("No se pudo actualizar la cola.");
+  } finally {
+    if (generation === queueGeneration)
+      queueTimer = setTimeout(() => refreshQueue(false), 1500);
+  }
+}
+$("queue-refresh").addEventListener("click", refreshQueue);
+refreshQueue();

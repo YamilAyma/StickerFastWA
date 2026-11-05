@@ -140,7 +140,7 @@ def run():
                     page.route(re.compile(base + r'/api/jobs/[a-f0-9]+/stickers$'), transient_preview_error)
                     page.locator('#create').click()
                     expect(page.locator('#retry')).to_be_visible()
-                    expect(page.locator('#create')).to_be_disabled()
+                    expect(page.locator('#create')).to_be_enabled()
                     page.locator('#retry').click()
                     expect(page.locator('#download')).to_be_visible(timeout=15000)
                     expect(page.locator('#job-title')).to_have_text('Tu pack está listo')
@@ -245,8 +245,67 @@ def run():
                     expect(page.locator('#result-grid .result-card')).to_have_count(1, timeout=15000)
                     expect(page.locator('#result-grid')).to_contain_text('2 frames')
                     page.locator('#delete-job').click()
+                    # ZIP import, accessible ordering, drag ordering, and batching.
+                    page.locator('#language').select_option('es')
+                    page.locator('#animated').uncheck()
+                    page.locator('#clear').click()
+                    bad_zip=io.BytesIO()
+                    with zipfile.ZipFile(bad_zip, 'w') as archive:
+                        archive.writestr('../escape.png', png('red'))
+                    page.locator('#files').set_input_files({'name':'unsafe.zip','mimeType':'application/zip','buffer':bad_zip.getvalue()})
+                    expect(page.locator('#message')).to_contain_text('rutas no permitidas')
+                    expect(page.locator('#media-grid .media-card')).to_have_count(0)
+                    collection=io.BytesIO()
+                    with zipfile.ZipFile(collection, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+                        for index in range(31):
+                            archive.writestr(f'set/{31-index:02d}.png', png('red' if index==0 else 'blue' if index==1 else 'green'))
+                        archive.writestr('notes.txt', 'ignored')
+                    page.set_viewport_size({'width':1440,'height':1100})
+                    page.locator('#files').set_input_files({'name':'photos.zip','mimeType':'application/zip','buffer':collection.getvalue()})
+                    expect(page.locator('#media-grid .media-card')).to_have_count(31, timeout=30000)
+                    expect(page.locator('#count')).to_have_text('31 / 300')
+                    expect(page.locator('#split-summary')).to_contain_text('2 paquetes')
+                    page.get_by_role('button', name='Subir photos/set/30.png', exact=True).click()
+                    expect(page.locator('#media-grid .media-meta label span').first).to_have_text('photos/set/30.png')
+                    page.locator('#media-grid .media-card').nth(0).drag_to(page.locator('#media-grid .media-card').nth(2))
+                    expect(page.locator('#media-grid .media-meta label span').nth(2)).to_have_text('photos/set/30.png')
+                    page.locator('#sort-files').select_option('name')
+                    expect(page.locator('#media-grid .media-meta label span').first).to_have_text('photos/set/01.png')
+                    page.locator('#name').fill('Large collection')
+                    page.locator('#create').click()
+                    expect(page.locator('#job-title')).to_have_text('Tu colección está lista', timeout=30000)
+                    expect(page.locator('#download')).to_have_text('Descargar colección ZIP')
+                    expect(page.locator('#result-grid .result-card')).to_have_count(31, timeout=15000)
+                    with page.expect_download() as download_info:
+                        page.locator('#download').click()
+                    assert download_info.value.suggested_filename=='Large collection.zip'
+                    with zipfile.ZipFile(download_info.value.path()) as bundle:
+                        assert len(bundle.namelist())==2
+                        with zipfile.ZipFile(io.BytesIO(bundle.read(bundle.namelist()[1]))) as pack:
+                            sticker=next(name for name in pack.namelist() if name.endswith('.webp'))
+                            with Image.open(io.BytesIO(pack.read(sticker))) as image:
+                                assert image.getpixel((256,256))[0]>200
+                    # Keep the first result while a second collection is generated.
+                    page.locator('#clear').click()
+                    page.locator('#files').set_input_files({'name':'next.png','mimeType':'image/png','buffer':png('blue')})
+                    page.locator('#name').fill('Next collection')
+                    page.locator('#create').click()
+                    expect(page.locator('#job-title')).to_have_text('Tu pack está listo', timeout=15000)
+                    page.locator('#queue-refresh').click()
+                    expect(page.locator('#queue-list .queue-row')).to_have_count(2)
+                    row=page.locator('#queue-list .queue-row').filter(has_text='Large collection')
+                    expect(row.locator('.queue-packs a')).to_have_count(2)
+                    row.get_by_role('button',name='Ver estado').click()
+                    expect(page.locator('#download')).to_have_text('Descargar colección ZIP')
+                    page.screenshot(path='/tmp/stickerfast-browser/large-collection.png',full_page=True)
+                    page.locator('#delete-job').click()
+                    page.locator('#queue-refresh').click()
+                    row=page.locator('#queue-list .queue-row').filter(has_text='Next collection')
+                    row.get_by_role('button',name='Ver estado').click()
+                    expect(page.locator('#download')).to_have_text('Descargar pack ↓')
+                    page.locator('#delete-job').click()
                     assert not errors, errors
-                    print('PASS: desktop/mobile editing, freehand/eraser/undo/original, exact package previews, animations preserved, both formats, six languages, preview/polling recovery; no JS errors')
+                    print('PASS: ZIP/multiple files, ordering/drag/sort, automatic packs, retained queue results, editing/previews, both formats, six languages; no JS errors')
                     context.close()
                 finally:
                     browser.close()
