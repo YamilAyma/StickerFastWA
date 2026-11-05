@@ -140,7 +140,7 @@ def test_animated_input(tmp_path, extension):
 
 def test_request_body_limit(tmp_path):
     with TestClient(create_app(tmp_path)) as client:
-        response = client.post('/api/jobs', content=b'', headers={'Content-Length': str(200 * 1024 * 1024)})
+        response = client.post('/api/jobs', content=b'', headers={'Content-Length': str(300 * 1024 * 1024)})
         assert response.status_code == 413
 
 

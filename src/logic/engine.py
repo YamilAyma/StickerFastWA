@@ -76,7 +76,7 @@ class StickerEngine:
             if self.cancel_flag:
                 return False
             with zipfile.ZipFile(archive, "a") as output:
-                for file in content.iterdir():
+                for file in sorted(content.iterdir()):
                     name = str(Path(content.name) / file.name) if package == "wemoji" else file.name
                     output.write(file, arcname=name, compress_type=zipfile.ZIP_DEFLATED)
             archive.replace(directory / f"{data.namepack}.{extension}")
@@ -118,7 +118,7 @@ class StickerEngine:
     def process_images(self, directory, destiny, animated=False, conserve_imgs=True, progress_callback=None, ignored_files=None, crop_mode="center_crop"):
         directory = os.path.abspath(directory)
         destiny = os.path.abspath(destiny)
-        files = [name for name in self.files_in_dir(directory)
+        files = [name for name in sorted(self.files_in_dir(directory))
                  if name not in (ignored_files or [])
                  and (self.validate_img(name) or self.validate_gif(name) or self.validate_video(name))][:30]
         for index, source_name in enumerate(files, 1):
@@ -129,7 +129,7 @@ class StickerEngine:
             if self.cancel_flag:
                 break
             source = os.path.join(directory, source_name)
-            name = f"{self.create_name('WS')}.webp"
+            name = f"{index:02d}-{self.create_name('WS')}.webp"
             if self.validate_video(source):
                 if not self.process_video_file(source, destiny, name, crop_mode=crop_mode):
                     raise ValueError("Could not convert video")

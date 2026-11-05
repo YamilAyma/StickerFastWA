@@ -20,9 +20,10 @@ from PIL import Image
 
 from logic.engine import StickerEngine
 from server.previews import describe_stickers, read_sticker
+from server.imports import import_router
 
 MAX_FILE_BYTES = 25 * 1024 * 1024
-MAX_JOB_BYTES = 100 * 1024 * 1024
+MAX_JOB_BYTES = 250 * 1024 * 1024
 MAX_JOBS = 16
 RETENTION_SECONDS = 3600
 IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.gif'}
@@ -37,9 +38,9 @@ class UploadLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope['type'] != 'http' or scope['path'] != '/api/jobs' or scope['method'] != 'POST':
+        if scope['type'] != 'http' or scope['path'] not in {'/api/jobs', '/api/imports'} or scope['method'] != 'POST':
             return await self.app(scope, receive, send)
-        limit = MAX_JOB_BYTES + 1024 * 1024  # Allow multipart metadata overhead.
+        limit = (100 * 1024 * 1024 if scope['path'] == '/api/imports' else MAX_JOB_BYTES) + 1024 * 1024  # Allow multipart metadata overhead.
         headers = dict(scope['headers'])
         try:
             length = int(headers.get(b'content-length', b'0'))
@@ -73,6 +74,8 @@ class Job:
     result: Path | None = None
     finished: float | None = None
     stickers: list[dict] = field(default_factory=list)
+    packs: list[dict] = field(default_factory=list)
+    future: object = None
 
 
 def validate_name(value: str) -> str:
@@ -130,6 +133,7 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
 
     app = FastAPI(title='StickerFastWA Local', version='0.1.0', lifespan=lifespan)
     web_dir = Path(__file__).resolve().parent / 'web'
+    app.include_router(import_router(root))
     app.mount('/web', StaticFiles(directory=web_dir), name='web')
     app.add_middleware(UploadLimitMiddleware)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', '[::1]', 'testserver'])
@@ -155,6 +159,18 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
                 shutil.rmtree(job.directory, ignore_errors=True)
                 del jobs[job_id]
 
+    def pack_data(job):
+        return [dict(index=index, name=pack['name'], status=pack['status'], total=pack['total'],
+                     download_url=f'/api/jobs/{job.id}/packs/{index}/download' if pack['status'] == 'completed' else None)
+                for index, pack in enumerate(job.packs)]
+
+    def job_data(job):
+        return dict(id=job.id, status=job.status, current=job.current, total=job.total,
+                    progress=100 if job.status == 'completed' else min(99, int(job.current / max(1, job.total) * 100)),
+                    error=job.error, packs=pack_data(job),
+                    preview_url=f'/api/jobs/{job.id}/stickers' if job.stickers else None,
+                    download_url=f'/api/jobs/{job.id}/download' if job.status == 'completed' else None)
+
     def run(job, options):
         result = None
         try:
@@ -162,26 +178,54 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
                 if job.cancel.is_set():
                     return
                 job.status = 'running'
-
-            def progress(current, total):
-                with lock:
-                    job.current = min(current, job.total)
-                if job.cancel.is_set():
-                    job.engine.cancel_processing()
-
-            success = job.engine.create_pack(options, progress_callback=progress)
+            inputs = Path(options['directory'])
+            sources = sorted(path for path in inputs.iterdir() if path.is_file())
+            offset = 0
             extension = 'wastickers' if options['package'] == 'stickerMaker' else 'wemojipack'
-            archive = Path(options['directory']) / f'{options["namepack"]}.{extension}'
-            if not job.cancel.is_set():
+            for index, pack in enumerate(job.packs):
+                if job.cancel.is_set():
+                    break
+                batch = inputs / f'part-{index:03d}'
+                batch.mkdir()
+                for source in sources[offset:offset + pack['total']]:
+                    source.replace(batch / source.name)
+                with lock:
+                    pack['status'] = 'running'
+
+                def progress(current, total):
+                    with lock:
+                        job.current = min(offset + current, job.total)
+                    if job.cancel.is_set():
+                        job.engine.cancel_processing()
+
+                success = job.engine.create_pack(dict(options, directory=str(batch), namepack=pack['name']), progress_callback=progress)
+                archive = batch / f'{pack["name"]}.{extension}'
+                if job.cancel.is_set():
+                    break
                 if not success or not archive.is_file():
-                    raise RuntimeError('No se pudo generar el paquete.')
+                    raise RuntimeError('Pack conversion failed')
                 with zipfile.ZipFile(archive) as output:
-                    if output.testzip() is not None or sum(n.endswith('.webp') for n in output.namelist()) != job.total:
-                        raise RuntimeError('La conversión no produjo todos los stickers esperados.')
-                job.stickers = describe_stickers(archive)
+                    if output.testzip() is not None or sum(n.endswith('.webp') for n in output.namelist()) != pack['total']:
+                        raise RuntimeError('Incomplete pack')
+                stickers = describe_stickers(archive)
                 destination = job.directory / archive.name
                 archive.replace(destination)
-                result = destination
+                with lock:
+                    pack['result'] = destination
+                    pack['status'] = 'completed'
+                    for sticker in stickers:
+                        job.stickers.append(dict(sticker, local_index=sticker['index'], index=len(job.stickers), pack_index=index, pack_name=pack['name']))
+                    offset += pack['total']
+                    job.current = offset
+            if not job.cancel.is_set():
+                if len(job.packs) == 1:
+                    result = job.packs[0]['result']
+                else:
+                    destination = job.directory / f'{options["namepack"]}.zip'
+                    with zipfile.ZipFile(destination, 'w', compression=zipfile.ZIP_STORED) as bundle:
+                        for pack in job.packs:
+                            bundle.write(pack['result'], arcname=pack['result'].name)
+                    result = destination
         except Exception:
             with lock:
                 job.error = 'No se pudo convertir el contenido del paquete.'
@@ -191,14 +235,15 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
             with lock:
                 if job.cancel.is_set():
                     job.status = 'cancelled'
-                    if result:
-                        result.unlink(missing_ok=True)
                 elif result is not None:
                     job.result = result
                     job.current = job.total
                     job.status = 'completed'
                 else:
                     job.status = 'failed'
+                for pack in job.packs:
+                    if pack['status'] != 'completed':
+                        pack['status'] = 'cancelled' if job.cancel.is_set() else ('failed' if pack['status'] == 'running' else 'skipped')
                 job.finished = time.monotonic()
 
     @app.get('/', include_in_schema=False)
@@ -222,8 +267,8 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
         name = validate_name(name)
         if not author.strip():
             raise HTTPException(422, 'El autor es obligatorio.')
-        if not 1 <= len(files) <= 30:
-            raise HTTPException(422, 'Selecciona entre 1 y 30 archivos.')
+        if not 1 <= len(files) <= 300:
+            raise HTTPException(422, 'Selecciona entre 1 y 300 archivos.')
         with lock:
             cleanup()
             if len(jobs) >= MAX_JOBS:
@@ -245,7 +290,7 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
                     size += len(chunk)
                     total_bytes += len(chunk)
                     if size > MAX_FILE_BYTES or total_bytes > MAX_JOB_BYTES:
-                        raise HTTPException(413, 'Máximo 25 MB por archivo y 100 MB por trabajo.')
+                        raise HTTPException(413, 'Máximo 25 MB por archivo y 250 MB por colección.')
                     output.write(chunk)
             if size == 0:
                 raise HTTPException(422, 'Archivo vacío.')
@@ -255,7 +300,7 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
                 suffix = Path(upload.filename or '').suffix.lower()
                 if suffix not in IMAGE_EXTENSIONS | VIDEO_EXTENSIONS:
                     raise HTTPException(422, 'Formato no admitido.')
-                target = inputs / f'{index:02d}{suffix}'
+                target = inputs / f'{index:04d}{suffix}'
                 await save(upload, target)
                 await asyncio.to_thread(validate_media, target, animated)
             icon_path = directory / 'icon.png'
@@ -287,8 +332,12 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
             options = dict(package=package, animated=animated, namepack=name, author=author.strip(),
                            directory=str(inputs), icon=str(icon_path), conserve=True, crop_mode=crop_mode)
             with lock:
+                parts = (len(files) + 29) // 30
+                job.packs = [dict(name=name if parts == 1 else f'{name[:68]} ({index + 1}-{parts})',
+                                  total=min(30, len(files) - index * 30), status='queued', result=None)
+                             for index in range(parts)]
                 job.status = 'queued'
-            pool.submit(run, job, options)
+                job.future = pool.submit(run, job, options)
             return {'id': job.id, 'status_url': f'/api/jobs/{job.id}'}
         except BaseException:
             with lock:
@@ -299,21 +348,36 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
             for upload in files + ([icon] if icon else []):
                 await upload.close()
 
+    @app.get('/api/jobs')
+    def list_jobs():
+        with lock:
+            return {'jobs': [job_data(job) for job in jobs.values()]}
+
     @app.get('/api/jobs/{job_id}')
     def get_job(job_id: str):
         with lock:
+            return job_data(lookup(job_id))
+
+    @app.get('/api/jobs/{job_id}/packs/{index}/download')
+    def download_pack(job_id: str, index: int):
+        from fastapi.responses import Response
+        from urllib.parse import quote
+        with lock:
             job = lookup(job_id)
-            return {'id': job.id, 'status': job.status, 'current': job.current, 'total': job.total,
-                    'progress': 100 if job.status == 'completed' else min(99, int(job.current / job.total * 100)),
-                    'error': job.error,
-                    'preview_url': f'/api/jobs/{job.id}/stickers' if job.status == 'completed' else None,
-                    'download_url': f'/api/jobs/{job.id}/download' if job.status == 'completed' else None}
+            if index < 0 or index >= len(job.packs):
+                raise HTTPException(404, 'Paquete no encontrado.')
+            pack = job.packs[index]
+            if pack['status'] != 'completed':
+                raise HTTPException(409, 'El paquete aún no está disponible.')
+            content = pack['result'].read_bytes()
+            filename = quote(pack['result'].name, safe='')
+        return Response(content, media_type='application/zip', headers={'Content-Disposition': f"attachment; filename*=UTF-8''{filename}"})
 
     @app.get('/api/jobs/{job_id}/stickers')
     def sticker_manifest(job_id: str):
         with lock:
             job = lookup(job_id)
-            if job.status != 'completed' or job.result is None:
+            if not job.stickers:
                 raise HTTPException(409, 'El paquete aún no está disponible.')
             return {'stickers': [dict(sticker, url=f'/api/jobs/{job.id}/stickers/{sticker["index"]}')
                                  for sticker in job.stickers]}
@@ -323,10 +387,13 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
         from fastapi.responses import Response
         with lock:
             job = lookup(job_id)
-            if job.status != 'completed' or job.result is None:
+            if not job.stickers:
                 raise HTTPException(409, 'El paquete aún no está disponible.')
             try:
-                content = read_sticker(job.result, index)
+                if index < 0:
+                    raise IndexError(index)
+                sticker = job.stickers[index]
+                content = read_sticker(job.packs[sticker['pack_index']]['result'], sticker['local_index'])
             except IndexError as error:
                 raise HTTPException(404, 'Sticker no encontrado.') from error
         return Response(content, media_type='image/webp',
@@ -340,6 +407,13 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
                 raise HTTPException(409, 'El trabajo ya terminó.')
             job.cancel.set()
             job.engine.cancel_processing()
+            if job.future and job.future.cancel():
+                job.status = 'cancelled'
+                job.finished = time.monotonic()
+                for pack in job.packs:
+                    pack['status'] = 'cancelled'
+                shutil.rmtree(job.directory / 'inputs', ignore_errors=True)
+                (job.directory / 'icon.png').unlink(missing_ok=True)
             return {'id': job.id, 'status': 'cancelling'}
 
     @app.get('/api/jobs/{job_id}/download')
