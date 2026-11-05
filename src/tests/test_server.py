@@ -191,3 +191,42 @@ def test_web_interface_and_assets_are_served(tmp_path):
                                files={'files': ('fake.png', b'invalid')})
         assert response.status_code == 422
         assert str(tmp_path) not in response.text
+
+
+@pytest.mark.parametrize('package', ['stickerMaker', 'wemoji'])
+def test_preview_matches_downloaded_archive(tmp_path, package):
+    with TestClient(create_app(tmp_path)) as client:
+        response = client.post('/api/jobs', data={'name': 'Preview', 'author': 'Test', 'package': package},
+                               files={'files': ('a.png', picture())})
+        job_id = response.json()['id']
+        job = wait_for_job(client, job_id)
+        manifest = client.get(job['preview_url']).json()
+        assert len(manifest['stickers']) == 1
+        sticker = manifest['stickers'][0]
+        preview = client.get(sticker['url'])
+        assert preview.status_code == 200
+        assert preview.headers['content-type'] == 'image/webp'
+        assert preview.headers['cache-control'] == 'no-store'
+        assert sticker['bytes'] == len(preview.content)
+        assert (sticker['width'], sticker['height'], sticker['frames'], sticker['duration_ms']) == (512, 512, 1, 0)
+        with zipfile.ZipFile(io.BytesIO(client.get(job['download_url']).content)) as archive:
+            name = next(name for name in archive.namelist() if name.endswith('.webp'))
+            assert archive.read(name) == preview.content
+        assert client.get(f'/api/jobs/{job_id}/stickers/-1').status_code == 404
+        assert client.get(f'/api/jobs/{job_id}/stickers/1').status_code == 404
+        assert client.delete(f'/api/jobs/{job_id}').status_code == 204
+        assert client.get(sticker['url']).status_code == 404
+
+
+def test_animated_preview_metadata(tmp_path):
+    frames = [Image.new('RGB', (80, 80), color) for color in ('red', 'blue')]
+    output = io.BytesIO()
+    frames[0].save(output, format='GIF', save_all=True, append_images=frames[1:], duration=[80, 160])
+    with TestClient(create_app(tmp_path)) as client:
+        response = client.post('/api/jobs', data={'name': 'Animated', 'author': 'Test', 'animated': 'true'},
+                               files={'files': ('animation.gif', output.getvalue())})
+        job = wait_for_job(client, response.json()['id'])
+        sticker = client.get(job['preview_url']).json()['stickers'][0]
+        assert sticker['frames'] == 2
+        assert sticker['duration_ms'] == 240
+        assert client.get(sticker['url']).status_code == 200

@@ -19,6 +19,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from PIL import Image
 
 from logic.engine import StickerEngine
+from server.previews import describe_stickers, read_sticker
 
 MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_JOB_BYTES = 100 * 1024 * 1024
@@ -71,6 +72,7 @@ class Job:
     error: str | None = None
     result: Path | None = None
     finished: float | None = None
+    stickers: list[dict] = field(default_factory=list)
 
 
 def validate_name(value: str) -> str:
@@ -176,6 +178,7 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
                 with zipfile.ZipFile(archive) as output:
                     if output.testzip() is not None or sum(n.endswith('.webp') for n in output.namelist()) != job.total:
                         raise RuntimeError('La conversión no produjo todos los stickers esperados.')
+                job.stickers = describe_stickers(archive)
                 destination = job.directory / archive.name
                 archive.replace(destination)
                 result = destination
@@ -303,7 +306,31 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine) ->
             return {'id': job.id, 'status': job.status, 'current': job.current, 'total': job.total,
                     'progress': 100 if job.status == 'completed' else min(99, int(job.current / job.total * 100)),
                     'error': job.error,
+                    'preview_url': f'/api/jobs/{job.id}/stickers' if job.status == 'completed' else None,
                     'download_url': f'/api/jobs/{job.id}/download' if job.status == 'completed' else None}
+
+    @app.get('/api/jobs/{job_id}/stickers')
+    def sticker_manifest(job_id: str):
+        with lock:
+            job = lookup(job_id)
+            if job.status != 'completed' or job.result is None:
+                raise HTTPException(409, 'El paquete aún no está disponible.')
+            return {'stickers': [dict(sticker, url=f'/api/jobs/{job.id}/stickers/{sticker["index"]}')
+                                 for sticker in job.stickers]}
+
+    @app.get('/api/jobs/{job_id}/stickers/{index}')
+    def sticker_preview(job_id: str, index: int):
+        from fastapi.responses import Response
+        with lock:
+            job = lookup(job_id)
+            if job.status != 'completed' or job.result is None:
+                raise HTTPException(409, 'El paquete aún no está disponible.')
+            try:
+                content = read_sticker(job.result, index)
+            except IndexError as error:
+                raise HTTPException(404, 'Sticker no encontrado.') from error
+        return Response(content, media_type='image/webp',
+                        headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
 
     @app.post('/api/jobs/{job_id}/cancel', status_code=202)
     def cancel_job(job_id: str):
