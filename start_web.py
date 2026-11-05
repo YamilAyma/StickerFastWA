@@ -46,7 +46,7 @@ def prepare_python():
         print('Instalando dependencias web. La primera vez puede tardar unos minutos…', flush=True)
         subprocess.run([str(python), '-m', 'pip', 'install', '-r', str(requirements)], check=True, cwd=ROOT)
         stamp.write_text(digest)
-    check = subprocess.run([str(python), '-c', 'import fastapi, uvicorn, multipart, PIL, numpy, webp, munch, cv2'], capture_output=True)
+    check = subprocess.run([str(python), '-c', 'import fastapi, uvicorn, multipart, PIL, numpy, webp, munch, cv2, rembg, onnxruntime'], capture_output=True)
     if check.returncode:
         stamp.unlink(missing_ok=True)
         raise RuntimeError('Las dependencias no están completas. Vuelve a ejecutar el lanzador para repararlas.')

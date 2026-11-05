@@ -23,6 +23,7 @@ from PIL import Image
 from logic.engine import StickerEngine
 from server.previews import describe_stickers, read_sticker
 from server.imports import import_router
+from server.background import background_router
 
 MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_JOB_BYTES = 250 * 1024 * 1024
@@ -40,9 +41,9 @@ class UploadLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope['type'] != 'http' or scope['path'] not in {'/api/jobs', '/api/imports'} or scope['method'] != 'POST':
+        if scope['type'] != 'http' or scope['path'] not in {'/api/jobs', '/api/imports', '/api/remove-background'} or scope['method'] != 'POST':
             return await self.app(scope, receive, send)
-        limit = (100 * 1024 * 1024 if scope['path'] == '/api/imports' else MAX_JOB_BYTES) + 1024 * 1024  # Allow multipart metadata overhead.
+        limit = ({'/api/imports': 100 * 1024 * 1024, '/api/remove-background': 25 * 1024 * 1024}.get(scope['path'], MAX_JOB_BYTES)) + 1024 * 1024  # Allow multipart metadata overhead.
         headers = dict(scope['headers'])
         try:
             length = int(headers.get(b'content-length', b'0'))
@@ -136,6 +137,7 @@ def create_app(data_dir: Path | None = None, *, engine_factory=StickerEngine, la
     app = FastAPI(title='StickerFastWA Local', version='0.1.0', lifespan=lifespan)
     web_dir = Path(__file__).resolve().parent / 'web'
     app.include_router(import_router(root))
+    app.include_router(background_router())
     app.mount('/web', StaticFiles(directory=web_dir), name='web')
     app.add_middleware(UploadLimitMiddleware)
     hosts = []
