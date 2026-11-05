@@ -204,7 +204,13 @@ window.STICKERFAST_TRANSLATIONS = {
     "Acceso de red local habilitado.": "Acceso de red local habilitado.",
     "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.",
     "No se pudo consultar la conexión.": "No se pudo consultar la conexión.",
-    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido."
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.",
+    "Quitar fondo": "Quitar fondo",
+    "Quitando fondo… La primera vez puede tardar mientras se descarga el modelo.": "Quitando fondo… La primera vez puede tardar mientras se descarga el modelo.",
+    "No se pudo quitar el fondo. La primera vez se necesita Internet para descargar el modelo.": "No se pudo quitar el fondo. La primera vez se necesita Internet para descargar el modelo.",
+    "Ya se está quitando otro fondo. Inténtalo en unos segundos.": "Ya se está quitando otro fondo. Inténtalo en unos segundos.",
+    "El archivo supera los 25 MB.": "El archivo supera los 25 MB.",
+    "Selecciona una imagen estática válida de hasta 25 megapíxeles.": "Selecciona una imagen estática válida de hasta 25 megapíxeles."
   },
   "en": {
     "En tu equipo": "On your computer",
@@ -411,7 +417,13 @@ window.STICKERFAST_TRANSLATIONS = {
     "Acceso de red local habilitado.": "Local network access enabled.",
     "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "To enable access, restart with the Start StickerFast LAN launcher.",
     "No se pudo consultar la conexión.": "Could not check the connection.",
-    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Connect your phone to the same Wi-Fi network and open one of these addresses. Keep the server running."
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Connect your phone to the same Wi-Fi network and open one of these addresses. Keep the server running.",
+    "Quitar fondo": "Remove background",
+    "Quitando fondo… La primera vez puede tardar mientras se descarga el modelo.": "Removing background… The first use may take longer while the model downloads.",
+    "No se pudo quitar el fondo. La primera vez se necesita Internet para descargar el modelo.": "Could not remove the background. Internet is needed to download the model the first time.",
+    "Ya se está quitando otro fondo. Inténtalo en unos segundos.": "Another background is being removed. Try again in a few seconds.",
+    "El archivo supera los 25 MB.": "The file exceeds 25 MB.",
+    "Selecciona una imagen estática válida de hasta 25 megapíxeles.": "Select a valid still image up to 25 megapixels."
   },
   "fr": {
     "En tu equipo": "Sur votre ordinateur",
@@ -618,7 +630,13 @@ window.STICKERFAST_TRANSLATIONS = {
     "Acceso de red local habilitado.": "Accès au réseau local activé.",
     "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "Pour activer l’accès, redémarrez avec le lanceur Start StickerFast LAN.",
     "No se pudo consultar la conexión.": "Impossible de vérifier la connexion.",
-    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Connectez le téléphone au même Wi-Fi et ouvrez une de ces adresses. Gardez le serveur allumé."
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Connectez le téléphone au même Wi-Fi et ouvrez une de ces adresses. Gardez le serveur allumé.",
+    "Quitar fondo": "Supprimer le fond",
+    "Quitando fondo… La primera vez puede tardar mientras se descarga el modelo.": "Suppression du fond… Le premier téléchargement du modèle peut prendre du temps.",
+    "No se pudo quitar el fondo. La primera vez se necesita Internet para descargar el modelo.": "Impossible de supprimer le fond. Internet est nécessaire au premier téléchargement du modèle.",
+    "Ya se está quitando otro fondo. Inténtalo en unos segundos.": "Une autre suppression est en cours. Réessayez dans quelques secondes.",
+    "El archivo supera los 25 MB.": "Le fichier dépasse 25 Mo.",
+    "Selecciona una imagen estática válida de hasta 25 megapíxeles.": "Sélectionnez une image fixe valide de 25 mégapixels maximum."
   },
   "de": {
     "En tu equipo": "Auf deinem Computer",
@@ -825,7 +843,13 @@ window.STICKERFAST_TRANSLATIONS = {
     "Acceso de red local habilitado.": "Zugriff im lokalen Netzwerk aktiviert.",
     "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "Starte zum Aktivieren mit dem Launcher Start StickerFast LAN neu.",
     "No se pudo consultar la conexión.": "Die Verbindung konnte nicht geprüft werden.",
-    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Verbinde dein Telefon mit demselben WLAN und öffne eine dieser Adressen. Lass den Server laufen."
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Verbinde dein Telefon mit demselben WLAN und öffne eine dieser Adressen. Lass den Server laufen.",
+    "Quitar fondo": "Hintergrund entfernen",
+    "Quitando fondo… La primera vez puede tardar mientras se descarga el modelo.": "Hintergrund wird entfernt… Beim ersten Mal wird das Modell heruntergeladen.",
+    "No se pudo quitar el fondo. La primera vez se necesita Internet para descargar el modelo.": "Der Hintergrund konnte nicht entfernt werden. Für den ersten Modelldownload ist Internet nötig.",
+    "Ya se está quitando otro fondo. Inténtalo en unos segundos.": "Ein anderer Hintergrund wird gerade entfernt. Versuche es in einigen Sekunden erneut.",
+    "El archivo supera los 25 MB.": "Die Datei überschreitet 25 MB.",
+    "Selecciona una imagen estática válida de hasta 25 megapíxeles.": "Wähle ein gültiges Standbild mit maximal 25 Megapixeln."
   },
   "it": {
     "En tu equipo": "Sul tuo computer",
@@ -1032,7 +1056,13 @@ window.STICKERFAST_TRANSLATIONS = {
     "Acceso de red local habilitado.": "Accesso alla rete locale abilitato.",
     "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "Per attivare l’accesso, riavvia con il launcher Start StickerFast LAN.",
     "No se pudo consultar la conexión.": "Impossibile verificare la connessione.",
-    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Collega il telefono alla stessa rete Wi-Fi e apri uno di questi indirizzi. Mantieni il server acceso."
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Collega il telefono alla stessa rete Wi-Fi e apri uno di questi indirizzi. Mantieni il server acceso.",
+    "Quitar fondo": "Rimuovi sfondo",
+    "Quitando fondo… La primera vez puede tardar mientras se descarga el modelo.": "Rimozione dello sfondo… Il primo download del modello può richiedere tempo.",
+    "No se pudo quitar el fondo. La primera vez se necesita Internet para descargar el modelo.": "Impossibile rimuovere lo sfondo. Serve Internet per scaricare il modello la prima volta.",
+    "Ya se está quitando otro fondo. Inténtalo en unos segundos.": "Un’altra rimozione è in corso. Riprova tra qualche secondo.",
+    "El archivo supera los 25 MB.": "Il file supera 25 MB.",
+    "Selecciona una imagen estática válida de hasta 25 megapíxeles.": "Seleziona un’immagine statica valida fino a 25 megapixel."
   },
   "pt": {
     "En tu equipo": "No seu computador",
@@ -1239,6 +1269,12 @@ window.STICKERFAST_TRANSLATIONS = {
     "Acceso de red local habilitado.": "Acesso à rede local ativado.",
     "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "Para ativar o acesso, reinicie com o iniciador Start StickerFast LAN.",
     "No se pudo consultar la conexión.": "Não foi possível verificar a conexão.",
-    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Conecte o telefone à mesma rede Wi-Fi e abra um destes endereços. Mantenha o servidor ligado."
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Conecte o telefone à mesma rede Wi-Fi e abra um destes endereços. Mantenha o servidor ligado.",
+    "Quitar fondo": "Remover fundo",
+    "Quitando fondo… La primera vez puede tardar mientras se descarga el modelo.": "Removendo fundo… Na primeira vez, o download do modelo pode demorar.",
+    "No se pudo quitar el fondo. La primera vez se necesita Internet para descargar el modelo.": "Não foi possível remover o fundo. É preciso Internet para baixar o modelo na primeira vez.",
+    "Ya se está quitando otro fondo. Inténtalo en unos segundos.": "Outra remoção está em andamento. Tente em alguns segundos.",
+    "El archivo supera los 25 MB.": "O arquivo excede 25 MB.",
+    "Selecciona una imagen estática válida de hasta 25 megapíxeles.": "Selecione uma imagem estática válida de até 25 megapixels."
   }
 };

@@ -83,6 +83,26 @@ def run():
                     expect(page.locator('.media-meta label span').first).to_have_text('red.png')
                     edit.click()
                     expect(page.locator('#editor-save')).to_be_enabled()
+                    # Exercise recovery and undo with a deterministic segmentation response.
+                    removed = io.BytesIO()
+                    Image.new('RGBA', (512,512), (0,0,0,0)).save(removed, 'PNG')
+                    requests = [0]
+                    def background_response(route):
+                        requests[0] += 1
+                        if requests[0] == 1:
+                            route.fulfill(status=503,json={'detail':'No se pudo quitar el fondo. La primera vez se necesita Internet para descargar el modelo.'})
+                        else:
+                            route.fulfill(status=200,content_type='image/png',body=removed.getvalue())
+                    page.route('**/api/remove-background', background_response)
+                    page.locator('#editor-remove-bg').click()
+                    expect(page.locator('#editor-error')).to_be_visible()
+                    expect(page.locator('#editor-remove-bg')).to_be_enabled()
+                    assert page.locator('#editor-canvas').evaluate("c => c.getContext('2d').getImageData(256,256,1,1).data[3]") == 255
+                    page.locator('#editor-remove-bg').click()
+                    expect(page.locator('#editor-remove-bg')).to_be_enabled()
+                    assert page.locator('#editor-canvas').evaluate("c => c.getContext('2d').getImageData(256,256,1,1).data[3]") == 0
+                    page.locator('#editor-undo').click()
+                    assert page.locator('#editor-canvas').evaluate("c => c.getContext('2d').getImageData(256,256,1,1).data[3]") == 255
                     page.locator('[data-tool="erase"]').click()
                     box = page.locator('#editor-canvas').bounding_box()
                     cx, cy = box['x'] + box['width']/2, box['y'] + box['height']/2

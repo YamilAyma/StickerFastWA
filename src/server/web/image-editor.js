@@ -344,6 +344,66 @@ window.StickerEditor = (() => {
     event.preventDefault();
     close(null);
   });
+  $("editor-remove-bg").addEventListener("click", async () => {
+    if (!source || saving) return;
+    const token = generation;
+    saving = true;
+    $("editor-save").disabled = true;
+    $("editor-fields").disabled = true;
+    $("editor-error").hidden = true;
+    $("editor-hint").textContent = t(
+      "Quitando fondo… La primera vez puede tardar mientras se descarga el modelo.",
+    );
+    try {
+      // Send artwork only, preserving editable text and borders as separate layers.
+      posed();
+      const blob = await new Promise((done) => layer.toBlob(done, "image/png"));
+      if (!blob) throw new Error();
+      const body = new FormData();
+      body.append("file", blob, "sticker.png");
+      const response = await fetch("/api/remove-background", {
+        method: "POST",
+        body,
+        signal: AbortSignal.timeout(180000),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(t(data.detail));
+      }
+      const bitmap = await createImageBitmap(await response.blob());
+      if (token !== generation) {
+        bitmap.close();
+        return;
+      }
+      artCtx.clearRect(0, 0, 512, 512);
+      artCtx.drawImage(bitmap, 0, 0, 512, 512);
+      bitmap.close();
+      values.zoom = 1;
+      values.x = 0;
+      values.y = 0;
+      angle = 0;
+      flip = 1;
+      sync();
+      draw();
+      record();
+    } catch (error) {
+      if (token !== generation) return;
+      $("editor-error").textContent =
+        error.message && error.name !== "TimeoutError"
+          ? error.message
+          : t(
+              "No se pudo quitar el fondo. La primera vez se necesita Internet para descargar el modelo.",
+            );
+      $("editor-error").hidden = false;
+    } finally {
+      if (token === generation) {
+        saving = false;
+        $("editor-save").disabled = false;
+        $("editor-fields").disabled = false;
+        chooseTool(tool);
+      }
+    }
+  });
   $("editor-save").addEventListener("click", () => {
     if (!source || saving) return;
     const token = generation;
