@@ -144,3 +144,23 @@ def test_finished_pack_survives_later_failure(tmp_path):
         assert client.get(job['packs'][0]['download_url']).status_code == 200
         assert job['packs'][1]['download_url'] is None
         assert not list(tmp_path.rglob('inputs'))
+
+
+def test_zip_count_and_total_limits(tmp_path, monkeypatch):
+    import server.imports as imports
+    with TestClient(create_app(tmp_path)) as client:
+        monkeypatch.setattr(imports, 'MAX_FILES', 1)
+        response = client.post('/api/imports', files={'file': ('many.zip', zip_files([('a.png', b'a'), ('b.png', b'b')]))})
+        assert response.status_code == 422
+        monkeypatch.setattr(imports, 'MAX_TOTAL', 1)
+        assert client.post('/api/imports', files={'file': ('big.zip', zip_files([('a.png', b'aa')]))}).status_code == 422
+        assert not list(tmp_path.rglob('import-*'))
+
+
+def test_corrupt_zip_compressed_content(tmp_path):
+    data = bytearray(zip_files([('a.png', picture())]))
+    start = 30 + len('a.png')
+    data[start:start+4] = b'\xff\xff\xff\xff'
+    with TestClient(create_app(tmp_path)) as client:
+        assert client.post('/api/imports', files={'file': ('corrupt.zip', bytes(data))}).status_code == 422
+        assert not list(tmp_path.rglob('import-*'))

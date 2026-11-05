@@ -5,6 +5,8 @@ import stat
 import time
 import uuid
 import zipfile
+import zlib
+import lzma
 from threading import Lock
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -49,7 +51,7 @@ def unpack(source: Path, target: Path):
                 if not written:
                     raise ValueError('Archivo vacío.')
                 files.append({'name': name, 'size': written, 'path': destination})
-    except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError, ValueError) as error:
+    except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError, ValueError, EOFError, zlib.error, lzma.LZMAError) as error:
         raise HTTPException(422, str(error) if isinstance(error, ValueError) else 'ZIP no válido.') from error
     if not files:
         raise HTTPException(422, 'El ZIP no contiene archivos multimedia compatibles.')
