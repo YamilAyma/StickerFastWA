@@ -947,3 +947,27 @@ async function refreshQueue(force = false) {
 }
 $("queue-refresh").addEventListener("click", refreshQueue);
 refreshQueue();
+
+$("phone-access").addEventListener("click", async () => {
+  $("phone-links").replaceChildren();
+  $("phone-status").textContent = t("Consultando conexión…");
+  $("phone-dialog").showModal();
+  try {
+    const info = await api("/api/launch-info");
+    $("phone-status").textContent = t(
+      info.lan
+        ? "Acceso de red local habilitado."
+        : "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.",
+    );
+    for (const url of info.urls) {
+      const link = document.createElement("a");
+      link.href = url;
+      link.textContent = url;
+      link.className = "button secondary";
+      $("phone-links").append(link);
+    }
+  } catch (error) {
+    $("phone-status").textContent = t("No se pudo consultar la conexión.");
+  }
+});
+$("phone-close").addEventListener("click", () => $("phone-dialog").close());

@@ -55,6 +55,10 @@ def run():
                     errors = []
                     page.on('pageerror', lambda error: errors.append(str(error)))
                     page.goto(base)
+                    page.locator('#phone-access').click()
+                    expect(page.locator('#phone-dialog')).to_be_visible()
+                    expect(page.locator('#phone-status')).to_contain_text('Start StickerFast LAN')
+                    page.locator('#phone-close').click()
                     expect(page.get_by_role('heading', name='Elige tus stickers')).to_be_visible()
                     expect(page.locator('#create')).to_be_disabled()
                     for width in (320, 768, 1024, 1440):

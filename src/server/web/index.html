@@ -27,6 +27,7 @@
         ><span>StickerFast <strong>WA</strong></span></a
       >
       <div class="header-actions">
+        <button type="button" id="phone-access" class="quiet">Teléfono</button>
         <label class="language-picker"
           ><span class="sr-only">Idioma</span
           ><select id="language" aria-label="Idioma">
@@ -491,6 +492,22 @@
           Guardar edición
         </button>
       </div>
+    </dialog>
+    <dialog
+      id="phone-dialog"
+      class="preview-dialog"
+      aria-labelledby="phone-title"
+    >
+      <div class="dialog-heading">
+        <h2 id="phone-title">Abrir desde el teléfono</h2>
+        <button type="button" id="phone-close" class="quiet">Cerrar</button>
+      </div>
+      <p id="phone-status" role="status"></p>
+      <div id="phone-links"></div>
+      <p>
+        Conecta el teléfono a la misma red Wi-Fi y abre una de estas
+        direcciones. Mantén el servidor encendido.
+      </p>
     </dialog>
   </body>
 </html>

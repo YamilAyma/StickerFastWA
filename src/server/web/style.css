@@ -1131,3 +1131,13 @@ dialog::backdrop {
   color: var(--accent);
   font-size: 12px;
 }
+#phone-dialog p {
+  font-size: 13px;
+  color: var(--muted);
+}
+#phone-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}

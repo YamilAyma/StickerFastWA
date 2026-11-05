@@ -197,7 +197,14 @@ window.STICKERFAST_TRANSLATIONS = {
     "Selecciona entre 1 y 300 archivos.": "Selecciona entre 1 y 300 archivos.",
     "Máximo 25 MB por archivo y 250 MB por colección.": "Máximo 25 MB por archivo y 250 MB por colección.",
     "Importando archivos…": "Importando archivos…",
-    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP de hasta 100 MB · Imágenes, GIF y videos"
+    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP de hasta 100 MB · Imágenes, GIF y videos",
+    "Teléfono": "Teléfono",
+    "Abrir desde el teléfono": "Abrir desde el teléfono",
+    "Consultando conexión…": "Consultando conexión…",
+    "Acceso de red local habilitado.": "Acceso de red local habilitado.",
+    "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.",
+    "No se pudo consultar la conexión.": "No se pudo consultar la conexión.",
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido."
   },
   "en": {
     "En tu equipo": "On your computer",
@@ -397,7 +404,14 @@ window.STICKERFAST_TRANSLATIONS = {
     "Selecciona entre 1 y 300 archivos.": "Select between 1 and 300 files.",
     "Máximo 25 MB por archivo y 250 MB por colección.": "Maximum 25 MB per file and 250 MB per collection.",
     "Importando archivos…": "Importing files…",
-    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP up to 100 MB · Images, GIFs and videos"
+    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP up to 100 MB · Images, GIFs and videos",
+    "Teléfono": "Phone",
+    "Abrir desde el teléfono": "Open on your phone",
+    "Consultando conexión…": "Checking connection…",
+    "Acceso de red local habilitado.": "Local network access enabled.",
+    "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "To enable access, restart with the Start StickerFast LAN launcher.",
+    "No se pudo consultar la conexión.": "Could not check the connection.",
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Connect your phone to the same Wi-Fi network and open one of these addresses. Keep the server running."
   },
   "fr": {
     "En tu equipo": "Sur votre ordinateur",
@@ -597,7 +611,14 @@ window.STICKERFAST_TRANSLATIONS = {
     "Selecciona entre 1 y 300 archivos.": "Sélectionnez entre 1 et 300 fichiers.",
     "Máximo 25 MB por archivo y 250 MB por colección.": "Maximum 25 Mo par fichier et 250 Mo par collection.",
     "Importando archivos…": "Importation des fichiers…",
-    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP jusqu’à 100 Mo · Images, GIF et vidéos"
+    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP jusqu’à 100 Mo · Images, GIF et vidéos",
+    "Teléfono": "Téléphone",
+    "Abrir desde el teléfono": "Ouvrir sur le téléphone",
+    "Consultando conexión…": "Vérification de la connexion…",
+    "Acceso de red local habilitado.": "Accès au réseau local activé.",
+    "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "Pour activer l’accès, redémarrez avec le lanceur Start StickerFast LAN.",
+    "No se pudo consultar la conexión.": "Impossible de vérifier la connexion.",
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Connectez le téléphone au même Wi-Fi et ouvrez une de ces adresses. Gardez le serveur allumé."
   },
   "de": {
     "En tu equipo": "Auf deinem Computer",
@@ -797,7 +818,14 @@ window.STICKERFAST_TRANSLATIONS = {
     "Selecciona entre 1 y 300 archivos.": "Wähle zwischen 1 und 300 Dateien aus.",
     "Máximo 25 MB por archivo y 250 MB por colección.": "Maximal 25 MB pro Datei und 250 MB pro Sammlung.",
     "Importando archivos…": "Dateien werden importiert…",
-    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP bis 100 MB · Bilder, GIFs und Videos"
+    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP bis 100 MB · Bilder, GIFs und Videos",
+    "Teléfono": "Telefon",
+    "Abrir desde el teléfono": "Auf dem Telefon öffnen",
+    "Consultando conexión…": "Verbindung wird geprüft…",
+    "Acceso de red local habilitado.": "Zugriff im lokalen Netzwerk aktiviert.",
+    "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "Starte zum Aktivieren mit dem Launcher Start StickerFast LAN neu.",
+    "No se pudo consultar la conexión.": "Die Verbindung konnte nicht geprüft werden.",
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Verbinde dein Telefon mit demselben WLAN und öffne eine dieser Adressen. Lass den Server laufen."
   },
   "it": {
     "En tu equipo": "Sul tuo computer",
@@ -997,7 +1025,14 @@ window.STICKERFAST_TRANSLATIONS = {
     "Selecciona entre 1 y 300 archivos.": "Seleziona da 1 a 300 file.",
     "Máximo 25 MB por archivo y 250 MB por colección.": "Massimo 25 MB per file e 250 MB per raccolta.",
     "Importando archivos…": "Importazione dei file…",
-    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP fino a 100 MB · Immagini, GIF e video"
+    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP fino a 100 MB · Immagini, GIF e video",
+    "Teléfono": "Telefono",
+    "Abrir desde el teléfono": "Apri dal telefono",
+    "Consultando conexión…": "Verifica della connessione…",
+    "Acceso de red local habilitado.": "Accesso alla rete locale abilitato.",
+    "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "Per attivare l’accesso, riavvia con il launcher Start StickerFast LAN.",
+    "No se pudo consultar la conexión.": "Impossibile verificare la connessione.",
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Collega il telefono alla stessa rete Wi-Fi e apri uno di questi indirizzi. Mantieni il server acceso."
   },
   "pt": {
     "En tu equipo": "No seu computador",
@@ -1197,6 +1232,13 @@ window.STICKERFAST_TRANSLATIONS = {
     "Selecciona entre 1 y 300 archivos.": "Selecione entre 1 e 300 arquivos.",
     "Máximo 25 MB por archivo y 250 MB por colección.": "Máximo de 25 MB por arquivo e 250 MB por coleção.",
     "Importando archivos…": "Importando arquivos…",
-    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP de até 100 MB · Imagens, GIFs e vídeos"
+    "ZIP de hasta 100 MB · Imágenes, GIF y videos": "ZIP de até 100 MB · Imagens, GIFs e vídeos",
+    "Teléfono": "Telefone",
+    "Abrir desde el teléfono": "Abrir no telefone",
+    "Consultando conexión…": "Verificando conexão…",
+    "Acceso de red local habilitado.": "Acesso à rede local ativado.",
+    "Para habilitar el acceso, reinicia con el lanzador Start StickerFast LAN.": "Para ativar o acesso, reinicie com o iniciador Start StickerFast LAN.",
+    "No se pudo consultar la conexión.": "Não foi possível verificar a conexão.",
+    "Conecta el teléfono a la misma red Wi-Fi y abre una de estas direcciones. Mantén el servidor encendido.": "Conecte o telefone à mesma rede Wi-Fi e abra um destes endereços. Mantenha o servidor ligado."
   }
 };
