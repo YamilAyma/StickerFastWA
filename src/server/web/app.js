@@ -122,6 +122,10 @@ function updateSummary() {
     "{count} paquetes · hasta 30 stickers por paquete",
     { count: Math.ceil(selection.length / 30) },
   );
+  if ($("compatibility").value === "strict")
+    $("split-summary").textContent = t(
+      "Se separarán por tipo; se necesitan al menos 3 de cada tipo.",
+    );
   $("empty-note").hidden = entries.length > 0;
   $("collection-toolbar").hidden = entries.length === 0;
   $("create").disabled = busy || selection.length === 0;
@@ -262,16 +266,26 @@ function renderFiles() {
     }
     const actions = document.createElement("div");
     actions.className = "card-actions";
-    if (!videos.has(suffix(entry.file)) && suffix(entry.file) !== "gif") {
+    {
       const edit = document.createElement("button");
       edit.type = "button";
       edit.className = "quiet";
-      edit.textContent = t("Editar imagen");
+      edit.textContent = t(
+        videos.has(suffix(entry.file))
+          ? "Elegir fragmento"
+          : suffix(entry.file) === "gif"
+            ? "Editar animación"
+            : "Editar imagen",
+      );
       edit.addEventListener("click", async () => {
         if (busy) return;
         edit.disabled = true;
         try {
-          const result = await window.StickerEditor.open(entry.file);
+          const result = await ((await window.AnimationEditor.matches(
+            entry.file,
+          ))
+            ? window.AnimationEditor.open(entry.file)
+            : window.StickerEditor.open(entry.file));
           if (result && entries.includes(entry)) {
             entry.original ??= entry.file;
             URL.revokeObjectURL(entry.url);
@@ -362,12 +376,6 @@ async function addFiles(incoming) {
     }
     entries.push({ file, url: URL.createObjectURL(file), selected: true });
   }
-  if (
-    entries.some(
-      (entry) => videos.has(suffix(entry.file)) || suffix(entry.file) === "gif",
-    )
-  )
-    $("animated").checked = true;
   showMessage(errors.join(" "));
   const direction = $("sort-files").value;
   if (direction !== "manual")
@@ -520,6 +528,10 @@ async function poll() {
     const job = await api(`/api/jobs/${id}`);
     if (activeJob !== id) return;
     $("retry").hidden = true;
+    $("compatibility-message").textContent = (job.warnings || [])
+      .map((message) => t(message))
+      .join(" ");
+    $("compatibility-message").hidden = !job.warnings?.length;
     $("progress").value = job.progress;
     $("job-percentage").textContent = `${job.progress} %`;
     if (job.status === "completed") {
@@ -654,18 +666,10 @@ $("pack-form").addEventListener("submit", async (event) => {
     showMessage("La colección supera los 250 MB.");
     return;
   }
-  const animated = $("animated").checked;
-  if (
-    animated &&
-    selection.some(
-      (entry) => !["gif", "webp", ...videos].includes(suffix(entry.file)),
-    )
-  ) {
-    showMessage("Para un pack animado, selecciona solo GIF, WebP o videos.");
-    return;
-  }
-  if (!animated && selection.some((entry) => videos.has(suffix(entry.file)))) {
-    showMessage("Activa Pack animado para convertir videos.");
+  if (selection.some((entry) => videos.has(suffix(entry.file)))) {
+    showMessage(
+      t("Elige el fragmento de cada video antes de crear el paquete."),
+    );
     return;
   }
   showMessage();
@@ -676,7 +680,8 @@ $("pack-form").addEventListener("submit", async (event) => {
   form.append("name", name);
   form.append("author", author);
   form.append("package", $("package").value);
-  form.append("animated", String(animated));
+  form.append("animated", "true");
+  form.append("strict_whatsapp", String($("compatibility").value === "strict"));
   form.append("crop_mode", $("crop-mode").value);
   if (icon) form.append("icon", icon);
   uploading = true;
@@ -752,6 +757,8 @@ $("language").addEventListener("change", () => {
 });
 
 function clearResults() {
+  $("compatibility-message").hidden = true;
+  $("compatibility-message").textContent = "";
   resultGeneration++;
   resultJob = null;
   $("result-panel").hidden = true;
@@ -795,6 +802,12 @@ async function loadResults(id, url, force = false) {
       });
       button.append(image);
       button.addEventListener("click", () => {
+        if (sticker.frames > 1) {
+          window.AnimationEditor.viewResult(sticker.url).catch((error) =>
+            showMessage(error.message),
+          );
+          return;
+        }
         $("result-dialog-title").textContent = title;
         $("result-image").src = sticker.url;
         $("result-image").alt = title;
@@ -806,7 +819,9 @@ async function loadResults(id, url, force = false) {
       const label = document.createElement("strong");
       label.textContent = title;
       const info = document.createElement("small");
-      info.textContent = stickerDetail(sticker);
+      info.textContent =
+        stickerDetail(sticker) +
+        (sticker.validation?.valid ? " · " + t("Validado") : "");
       if (
         sticker.pack_name &&
         manifest.stickers.some((item) => item.pack_index > 0)
@@ -972,3 +987,5 @@ $("phone-access").addEventListener("click", async () => {
   }
 });
 $("phone-close").addEventListener("click", () => $("phone-dialog").close());
+
+$("compatibility").addEventListener("change", updateSummary);

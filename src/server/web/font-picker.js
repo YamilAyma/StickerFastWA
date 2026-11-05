@@ -86,6 +86,9 @@ window.StickerFonts = (() => {
   search.addEventListener("input", () => refresh());
   return {
     ready,
+    choices() {
+      return catalog.map((item) => ({ ...item }));
+    },
     load,
     refresh,
     select(id) {

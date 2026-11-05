@@ -11,6 +11,7 @@
     <script src="/web/font-picker.js" defer></script>
     <script src="/web/image-editor.js" defer></script>
     <script src="/web/collection-inputs.js" defer></script>
+    <script src="/web/animation-editor.js" defer></script>
     <script src="/web/app.js" defer></script>
   </head>
   <body>
@@ -172,18 +173,18 @@
                 <option value="wemoji">Wemoji · .wemojipack</option>
               </select></label
             >
-            <div class="mode-switch">
-              <div>
-                <label for="animated">Pack animado</label>
-                <p>Para GIF, WebP animado y videos</p>
-              </div>
-              <input
-                type="checkbox"
-                id="animated"
-                name="animated"
-                role="switch"
-              />
-            </div>
+            <p class="font-note">
+              Imágenes y GIF juntos por defecto. En los videos, elige un
+              fragmento de 1 a 10 segundos.
+            </p>
+            <label class="field"
+              >Compatibilidad del paquete<select id="compatibility">
+                <option value="mixed">Mixto: Sticker Maker / Wemoji</option>
+                <option value="strict">
+                  WhatsApp: separar imágenes y animaciones
+                </option>
+              </select></label
+            >
             <label class="field"
               >Encuadre de los stickers<select id="crop-mode" name="crop_mode">
                 <option value="center_crop">Recorte central · 1:1</option>
@@ -273,6 +274,7 @@
           </div>
         </div>
       </section>
+      <p id="compatibility-message" class="message" role="status" hidden></p>
       <section
         id="result-panel"
         class="panel result-panel"
@@ -529,6 +531,199 @@
         Conecta el teléfono a la misma red Wi-Fi y abre una de estas
         direcciones. Mantén el servidor encendido.
       </p>
+    </dialog>
+    <dialog
+      id="animation-editor"
+      class="editor-dialog"
+      aria-labelledby="animation-title"
+    >
+      <div class="dialog-heading">
+        <div>
+          <p class="step">ANIMACIÓN / GIF</p>
+          <h2 id="animation-title">Edita tu animación</h2>
+        </div>
+        <button id="animation-close" class="quiet" type="button">
+          Cancelar
+        </button>
+      </div>
+      <p id="animation-info" role="status"></p>
+      <p id="animation-error" class="message" role="alert" hidden></p>
+      <div class="editor-layout">
+        <div class="editor-visual">
+          <div
+            id="animation-screen"
+            class="transparency animation-screen"
+          ></div>
+          <div class="editor-tools">
+            <button type="button" id="animation-prev" class="quiet">
+              Cuadro anterior</button
+            ><button type="button" id="animation-play" class="quiet">
+              Reproducir / pausar</button
+            ><button type="button" id="animation-next" class="quiet">
+              Cuadro siguiente
+            </button>
+          </div>
+          <label class="field"
+            >Recorrer cuadros<input
+              id="animation-seek"
+              type="range"
+              min="0"
+              max="1"
+              value="0"
+              step="1"
+          /></label>
+          <p id="animation-position" role="status"></p>
+          <div class="editor-tools" id="animation-markers">
+            <button type="button" id="animation-mark-start" class="quiet">
+              Marcar inicio</button
+            ><button type="button" id="animation-mark-end" class="quiet">
+              Marcar fin
+            </button>
+          </div>
+          <div class="editor-tools">
+            <button type="button" id="animation-source" class="quiet">
+              Ver original</button
+            ><button type="button" id="animation-result" class="quiet" disabled>
+              Ver resultado
+            </button>
+          </div>
+        </div>
+        <div class="editor-controls" id="animation-options">
+          <fieldset id="animation-fields">
+            <p>
+              Elige inicio y fin. Máximo 10 segundos; los fragmentos de video
+              deben durar al menos 1 segundo.
+            </p>
+            <label class="field"
+              >Inicio (segundos)<input
+                id="animation-start"
+                type="number"
+                min="0"
+                step="0.01"
+                value="0"
+            /></label>
+            <label class="field"
+              >Fin (segundos)<input
+                id="animation-end"
+                type="number"
+                min="0"
+                step="0.01"
+                value="1"
+            /></label>
+            <label class="field"
+              >Encuadre de los stickers<select id="animation-crop_mode">
+                <option value="fit">
+                  Original · ajustar con transparencia
+                </option>
+                <option value="center_crop">Recorte central · 1:1</option>
+              </select></label
+            >
+            <label class="field"
+              >Zoom<input
+                id="animation-zoom"
+                type="range"
+                min="0.25"
+                max="4"
+                step="0.05"
+                value="1"
+            /></label>
+            <label class="field"
+              >Posición horizontal<input
+                id="animation-x"
+                type="range"
+                min="-512"
+                max="512"
+                value="0"
+            /></label>
+            <label class="field"
+              >Posición vertical<input
+                id="animation-y"
+                type="range"
+                min="-512"
+                max="512"
+                value="0"
+            /></label>
+            <label class="field"
+              >Girar<select id="animation-rotate">
+                <option value="0">0°</option>
+                <option value="90">90°</option>
+                <option value="180">180°</option>
+                <option value="270">270°</option>
+              </select></label
+            >
+            <label class="field"
+              >Voltear<input id="animation-flip" type="checkbox"
+            /></label>
+            <label class="field"
+              >Texto<input
+                id="animation-text"
+                maxlength="120"
+                placeholder="Añade una frase"
+            /></label>
+            <label class="field"
+              >Fuente de Google Fonts<select id="animation-font">
+                <option value="default">Comic Neue</option>
+              </select></label
+            >
+            <label class="field"
+              >Tamaño del texto<input
+                id="animation-font_size"
+                type="range"
+                min="16"
+                max="80"
+                value="40"
+            /></label>
+            <label class="field"
+              >Altura del texto<input
+                id="animation-text_y"
+                type="range"
+                min="48"
+                max="464"
+                value="432"
+            /></label>
+            <label class="field"
+              >Color del texto<input
+                id="animation-text_color"
+                type="color"
+                value="#ffffff"
+            /></label>
+            <label class="field"
+              >Quitar fondo de todos los cuadros<input
+                id="animation-remove_bg"
+                type="checkbox"
+            /></label>
+            <p>
+              La eliminación de fondo se realiza cuadro por cuadro y puede
+              tardar. Revisa los bordes en la vista previa.
+            </p>
+          </fieldset>
+        </div>
+      </div>
+      <p id="animation-validation" role="status"></p>
+      <div class="editor-footer">
+        <div>
+          <button type="button" id="animation-undo" class="quiet" disabled>
+            Deshacer</button
+          ><button type="button" id="animation-reset" class="quiet">
+            Reiniciar edición
+          </button>
+        </div>
+        <button
+          type="button"
+          id="animation-render"
+          class="button secondary"
+          disabled
+        >
+          Generar vista previa</button
+        ><button
+          type="button"
+          id="animation-apply"
+          class="button primary"
+          disabled
+        >
+          Usar animación
+        </button>
+      </div>
     </dialog>
   </body>
 </html>
