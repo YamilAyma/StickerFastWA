@@ -68,6 +68,51 @@ def run():
                     expect(page.locator('.media-card')).to_have_count(2)
                     page.get_by_role('checkbox', name='Incluir blue.png').uncheck()
                     expect(page.locator('#selected-count')).to_have_text('1 sticker')
+                    # Editing stays in a draft until saved; erasing is undoable.
+                    edit = page.get_by_role('button', name='Editar imagen').first
+                    edit.click()
+                    expect(page.locator('#image-editor')).to_be_visible()
+                    expect(page.locator('#editor-save')).to_be_enabled()
+                    page.locator('#editor-text').fill('Discard me')
+                    page.keyboard.press('Escape')
+                    expect(page.locator('#image-editor')).to_be_hidden()
+                    expect(page.locator('.media-meta label span').first).to_have_text('red.png')
+                    edit.click()
+                    expect(page.locator('#editor-save')).to_be_enabled()
+                    page.locator('[data-tool="erase"]').click()
+                    box = page.locator('#editor-canvas').bounding_box()
+                    cx, cy = box['x'] + box['width']/2, box['y'] + box['height']/2
+                    page.mouse.move(cx, cy)
+                    page.mouse.down()
+                    page.mouse.move(cx+2, cy+2)
+                    page.mouse.up()
+                    assert page.locator('#editor-canvas').evaluate("c => c.getContext('2d').getImageData(256,256,1,1).data[3]") == 0
+                    page.locator('#editor-undo').click()
+                    assert page.locator('#editor-canvas').evaluate("c => c.getContext('2d').getImageData(256,256,1,1).data[3]") == 255
+                    page.locator('#editor-circle').click()
+                    page.locator('#editor-save').click()
+                    expect(page.get_by_role('button', name='Restaurar original')).to_be_visible()
+                    page.get_by_role('button', name='Restaurar original').click()
+                    expect(page.locator('.media-meta label span').first).to_have_text('red.png')
+                    page.get_by_role('button', name='Editar imagen').first.click()
+                    expect(page.locator('#editor-save')).to_be_enabled()
+                    # A freehand cut keeps only the polygon interior.
+                    page.locator('[data-tool="cut"]').click()
+                    box = page.locator('#editor-canvas').bounding_box()
+                    points = [(128,128),(384,128),(384,384),(128,384),(128,128)]
+                    page.mouse.move(box['x']+points[0][0]*box['width']/512, box['y']+points[0][1]*box['height']/512)
+                    page.mouse.down()
+                    for x,y in points[1:]:
+                        page.mouse.move(box['x']+x*box['width']/512, box['y']+y*box['height']/512, steps=3)
+                    page.mouse.up()
+                    assert page.locator('#editor-canvas').evaluate("c => c.getContext('2d').getImageData(64,256,1,1).data[3]") == 0
+                    page.locator('#editor-text').fill('Hola')
+                    page.locator('#editor-border').fill('4')
+                    page.screenshot(path='/tmp/stickerfast-browser/editor-desktop.png', full_page=True)
+                    page.locator('#editor-save').click()
+                    expect(page.locator('#image-editor')).to_be_hidden(timeout=15000)
+                    assert not errors, errors
+                    expect(page.locator('.media-meta label span').first).to_have_text('red-editado.png', timeout=15000)
                     page.locator('#name').fill('Browser pack')
                     page.locator('#author').fill('Browser test')
                     page.locator('#icon').set_input_files({'name':'icon.png', 'mimeType':'image/png', 'buffer':png('green')})
@@ -83,6 +128,16 @@ def run():
                             route.continue_()
 
                     page.route(re.compile(base + r'/api/jobs/[a-f0-9]+$'), transient_status_error)
+                    fail_preview_once = [True]
+
+                    def transient_preview_error(route):
+                        if fail_preview_once[0]:
+                            fail_preview_once[0] = False
+                            route.fulfill(status=503, json={'detail': 'Temporary failure'})
+                        else:
+                            route.continue_()
+
+                    page.route(re.compile(base + r'/api/jobs/[a-f0-9]+/stickers$'), transient_preview_error)
                     page.locator('#create').click()
                     expect(page.locator('#retry')).to_be_visible()
                     expect(page.locator('#create')).to_be_disabled()
@@ -90,6 +145,9 @@ def run():
                     expect(page.locator('#download')).to_be_visible(timeout=15000)
                     expect(page.locator('#job-title')).to_have_text('Tu pack está listo')
                     expect(page.locator('#job-percentage')).to_have_text('100 %')
+                    expect(page.locator('#result-retry')).to_be_visible()
+                    expect(page.locator('#download')).to_be_visible()
+                    page.locator('#result-retry').click()
                     with page.expect_download() as download_info:
                         page.locator('#download').click()
                     download = download_info.value
@@ -97,6 +155,15 @@ def run():
                     with zipfile.ZipFile(download.path()) as archive:
                         assert archive.read('title.txt') == b'Browser pack'
                         assert sum(name.endswith('.webp') for name in archive.namelist()) == 1
+                        sticker_name = next(name for name in archive.namelist() if name.endswith('.webp'))
+                        with Image.open(io.BytesIO(archive.read(sticker_name))) as sticker:
+                            assert sticker.getpixel((64,256))[3] == 0
+                    expect(page.locator('#result-grid .result-card')).to_have_count(1)
+                    page.get_by_role('button', name='Ampliar Sticker 1').click()
+                    expect(page.locator('#result-dialog')).to_be_visible()
+                    expect(page.locator('#result-image')).to_have_js_property('naturalWidth', 512)
+                    page.locator('#close-result').click()
+                    page.screenshot(path='/tmp/stickerfast-browser/package-result.png', full_page=True)
                     # Reload recovers the completed job and optional browser preferences.
                     page.locator('#theme').click()
                     page.reload()
@@ -111,6 +178,12 @@ def run():
                     page.screenshot(path='/tmp/stickerfast-browser/mobile-light.png', full_page=True)
                     # Exercise mobile Wemoji creation and remove/exclude interactions.
                     page.locator('#files').set_input_files({'name':'mobile.png', 'mimeType':'image/png', 'buffer':png('blue')})
+                    page.get_by_role('button', name='Editar imagen').click()
+                    expect(page.locator('#editor-save')).to_be_enabled()
+                    page.locator('#editor-rotate').click()
+                    page.locator('#editor-flip').click()
+                    page.screenshot(path='/tmp/stickerfast-browser/editor-mobile.png', full_page=True)
+                    page.locator('#editor-close').click()
                     page.locator('#name').fill('Mobile pack')
                     page.locator('#package').select_option('wemoji')
                     page.locator('#create').click()
@@ -146,6 +219,10 @@ def run():
                     expect(page.locator('#message')).to_contain_text('Could not read the file.')
                     page.locator('#clear').click()
                     page.locator('#files').set_input_files({'name':'english.png', 'mimeType':'image/png', 'buffer':png('red')})
+                    page.get_by_role('button', name='Edit image').click()
+                    expect(page.locator('#editor-title')).to_have_text('Edit your sticker')
+                    expect(page.locator('#editor-save')).to_have_text('Save edits')
+                    page.locator('#editor-close').click()
                     page.locator('#crop-mode').select_option('fit')
                     page.locator('#create').click()
                     expect(page.locator('#job-title')).to_have_text('Your pack is ready', timeout=15000)
@@ -154,8 +231,22 @@ def run():
                     expect(page.locator('#job-title')).to_have_text('Votre pack est prêt')
                     expect(page.locator('#download')).to_have_text('Télécharger le pack ↓')
                     page.locator('#delete-job').click()
+                    page.locator('#language').select_option('en')
+                    page.locator('#clear').click()
+                    animation = io.BytesIO()
+                    frames = [Image.new('RGB', (80,80), color) for color in ('red', 'blue')]
+                    frames[0].save(animation, format='WEBP', save_all=True, append_images=frames[1:], duration=[80,160])
+                    page.locator('#files').set_input_files({'name':'animated.webp', 'mimeType':'image/webp', 'buffer':animation.getvalue()})
+                    page.get_by_role('button', name='Edit image').click()
+                    expect(page.locator('#message')).to_contain_text('Your file keeps its animation.')
+                    expect(page.locator('#image-editor')).to_be_hidden()
+                    page.locator('#animated').check()
+                    page.locator('#create').click()
+                    expect(page.locator('#result-grid .result-card')).to_have_count(1, timeout=15000)
+                    expect(page.locator('#result-grid')).to_contain_text('2 frames')
+                    page.locator('#delete-job').click()
                     assert not errors, errors
-                    print('PASS: desktop/mobile creation, both formats, six languages, localized errors/status, preferences, reload and polling recovery; no JS errors')
+                    print('PASS: desktop/mobile editing, freehand/eraser/undo/original, exact package previews, animations preserved, both formats, six languages, preview/polling recovery; no JS errors')
                     context.close()
                 finally:
                     browser.close()

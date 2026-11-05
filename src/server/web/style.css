@@ -814,3 +814,236 @@ body.busy .dropzone {
     max-width: 100px;
   }
 }
+
+.card-actions {
+  padding: 0 9px 10px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.card-actions .quiet {
+  font-size: 10px;
+  padding: 6px 9px;
+  width: 100%;
+}
+.card-actions .text-button {
+  font-size: 9px;
+}
+.result-panel {
+  margin-top: 24px;
+  padding: 26px;
+}
+.result-panel > p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 22px;
+}
+.result-card .preview {
+  border: 0;
+  cursor: zoom-in;
+  width: 100%;
+  color: var(--text);
+  background-color: var(--surface);
+}
+.result-card strong {
+  font-size: 12px;
+}
+.result-card img {
+  pointer-events: none;
+}
+.transparency {
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(45deg, #8091a51f 25%, transparent 25%),
+    linear-gradient(-45deg, #8091a51f 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #8091a51f 75%),
+    linear-gradient(-45deg, transparent 75%, #8091a51f 75%);
+  background-size: 20px 20px;
+  background-position:
+    0 0,
+    0 10px,
+    10px -10px,
+    -10px 0;
+}
+dialog {
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 30px 100px #0008;
+}
+dialog::backdrop {
+  background: #020817b8;
+  backdrop-filter: blur(6px);
+}
+.dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.dialog-heading h2 {
+  font-size: 20px;
+}
+.preview-dialog {
+  width: min(600px, 94vw);
+  max-height: 94dvh;
+  overflow: auto;
+}
+.preview-large {
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+}
+.preview-large img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+#result-detail {
+  font-size: 12px;
+  color: var(--muted);
+}
+.editor-dialog {
+  width: min(1000px, 96vw);
+  max-height: 94dvh;
+  overflow: auto;
+}
+.editor-intro {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+.editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 24px;
+  align-items: start;
+}
+.editor-visual {
+  min-width: 0;
+  position: sticky;
+  top: 0;
+}
+.editor-stage {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.editor-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.editor-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.editor-tools button {
+  font-size: 11px;
+  padding: 8px 10px;
+  flex: 1;
+  white-space: nowrap;
+}
+.editor-tools [aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.editor-controls .field {
+  margin-bottom: 13px;
+}
+.editor-controls input[type="range"] {
+  padding: 0;
+  accent-color: var(--accent);
+  height: 22px;
+}
+.editor-controls input[type="color"] {
+  padding: 3px;
+  width: 100%;
+  height: 34px;
+}
+.editor-color-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.editor-controls {
+  max-height: 60dvh;
+  overflow: auto;
+  padding: 2px 9px 2px 2px;
+}
+#editor-hint {
+  font-size: 12px;
+  color: var(--muted);
+  min-height: 36px;
+}
+.editor-footer {
+  border-top: 1px solid var(--line);
+  padding-top: 17px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 18px;
+}
+.editor-footer > div {
+  display: flex;
+  gap: 8px;
+}
+.editor-footer button {
+  font-size: 12px;
+}
+#editor-error {
+  font-size: 12px;
+  padding: 10px;
+}
+.editor-color-row label {
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  dialog {
+    padding: 17px;
+  }
+  .editor-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .editor-visual {
+    position: static;
+  }
+  .editor-stage {
+    max-width: 400px;
+    margin: auto;
+  }
+  .editor-controls {
+    max-height: none;
+    overflow: visible;
+    padding: 2px;
+  }
+  .editor-footer {
+    flex-wrap: wrap;
+  }
+  .editor-footer > div {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .editor-footer > .primary {
+    width: 100%;
+  }
+  .result-panel {
+    padding: 20px;
+  }
+  .dialog-heading h2 {
+    font-size: 18px;
+  }
+}

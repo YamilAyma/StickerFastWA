@@ -21,6 +21,8 @@ let activeJob = null;
 let busy = false;
 let pollTimer = null;
 let uploadRequest = null;
+let resultJob = null;
+let resultGeneration = 0;
 const storage = {
   get(key) {
     try {
@@ -173,7 +175,49 @@ function renderFiles() {
     const info = document.createElement("small");
     info.textContent = `${suffix(entry.file).toUpperCase()} · ${bytes(entry.file.size)}`;
     meta.append(label, info);
-    card.append(preview, remove, meta);
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+    if (!videos.has(suffix(entry.file)) && suffix(entry.file) !== "gif") {
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "quiet";
+      edit.textContent = t("Editar imagen");
+      edit.addEventListener("click", async () => {
+        if (busy) return;
+        edit.disabled = true;
+        try {
+          const result = await window.StickerEditor.open(entry.file);
+          if (result && entries.includes(entry)) {
+            entry.original ??= entry.file;
+            URL.revokeObjectURL(entry.url);
+            entry.file = result;
+            entry.url = URL.createObjectURL(result);
+            renderFiles();
+          }
+        } catch (error) {
+          showMessage(error.message);
+        } finally {
+          edit.disabled = busy;
+        }
+      });
+      actions.append(edit);
+    }
+    if (entry.original) {
+      const restore = document.createElement("button");
+      restore.type = "button";
+      restore.className = "text-button";
+      restore.textContent = t("Restaurar original");
+      restore.addEventListener("click", () => {
+        if (busy) return;
+        URL.revokeObjectURL(entry.url);
+        entry.file = entry.original;
+        entry.original = null;
+        entry.url = URL.createObjectURL(entry.file);
+        renderFiles();
+      });
+      actions.append(restore);
+    }
+    card.append(preview, remove, meta, actions);
     $("media-grid").append(card);
   }
   updateSummary();
@@ -363,6 +407,7 @@ async function poll() {
       );
       $("download").href = job.download_url;
       $("download").hidden = false;
+      loadResults(id, job.preview_url);
     } else if (job.status === "failed") {
       finishJob(
         t("No se pudo crear el pack"),
@@ -392,6 +437,7 @@ async function poll() {
   } catch (error) {
     if (activeJob !== id) return;
     if (error.status === 404) {
+      clearResults();
       finishJob(
         t("El trabajo ya no está disponible"),
         t(
@@ -438,6 +484,7 @@ $("delete-job").addEventListener("click", async () => {
     activeJob = null;
     session.set(null);
     $("job-panel").hidden = true;
+    clearResults();
     showMessage();
   } catch (error) {
     showMessage(error.message);
@@ -517,6 +564,7 @@ $("pack-form").addEventListener("submit", async (event) => {
   $("job-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
   try {
     const job = await upload(form);
+    clearResults();
     activeJob = job.id;
     session.set(activeJob);
     storage.set("stickerfast-author", author);
@@ -568,3 +616,78 @@ $("language").addEventListener("change", () => {
     poll();
   }
 });
+
+function clearResults() {
+  resultGeneration++;
+  resultJob = null;
+  $("result-panel").hidden = true;
+  $("result-grid").replaceChildren();
+  $("result-image").removeAttribute("src");
+  if ($("result-dialog").open) $("result-dialog").close();
+}
+function stickerDetail(sticker) {
+  const detail = `${sticker.width} × ${sticker.height} · ${bytes(sticker.bytes)}`;
+  return sticker.frames > 1
+    ? `${detail} · ${(sticker.duration_ms / 1000).toLocaleString(window.I18n.language)} s · ${t("{count} cuadros", { count: sticker.frames })}`
+    : detail;
+}
+async function loadResults(id, url, force = false) {
+  if (!url || (!force && resultJob === `${id}:${window.I18n.language}`)) return;
+  const token = ++resultGeneration;
+  resultJob = `${id}:${window.I18n.language}`;
+  $("result-panel").hidden = false;
+  $("result-grid").replaceChildren();
+  $("result-message").textContent = t("Cargando el resultado del paquete…");
+  $("result-message").hidden = false;
+  $("result-retry").hidden = true;
+  try {
+    const manifest = await api(url);
+    if (token !== resultGeneration || activeJob !== id) return;
+    $("result-message").hidden = true;
+    for (const sticker of manifest.stickers) {
+      const card = document.createElement("article");
+      card.className = "media-card result-card";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "preview transparency";
+      const title = t("Sticker {number}", { number: sticker.index + 1 });
+      button.setAttribute("aria-label", t("Ampliar {name}", { name: title }));
+      const image = document.createElement("img");
+      image.src = sticker.url;
+      image.alt = title;
+      image.loading = "lazy";
+      image.addEventListener("error", () => {
+        button.textContent = t("Sin vista previa");
+      });
+      button.append(image);
+      button.addEventListener("click", () => {
+        $("result-dialog-title").textContent = title;
+        $("result-image").src = sticker.url;
+        $("result-image").alt = title;
+        $("result-detail").textContent = stickerDetail(sticker);
+        $("result-dialog").showModal();
+      });
+      const meta = document.createElement("div");
+      meta.className = "media-meta";
+      const label = document.createElement("strong");
+      label.textContent = title;
+      const info = document.createElement("small");
+      info.textContent = stickerDetail(sticker);
+      meta.append(label, info);
+      card.append(button, meta);
+      $("result-grid").append(card);
+    }
+  } catch (error) {
+    if (token !== resultGeneration) return;
+    resultJob = null;
+    $("result-message").textContent = t(
+      "No se pudo cargar la vista previa. El paquete sigue disponible para descargar.",
+    );
+    $("result-retry").hidden = false;
+  }
+}
+$("result-retry").addEventListener("click", () => {
+  if (activeJob)
+    loadResults(activeJob, `/api/jobs/${activeJob}/stickers`, true);
+});
+$("close-result").addEventListener("click", () => $("result-dialog").close());

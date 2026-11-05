@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/web/style.css" />
     <script src="/web/locales.js" defer></script>
     <script src="/web/i18n.js" defer></script>
+    <script src="/web/image-editor.js" defer></script>
     <script src="/web/app.js" defer></script>
   </head>
   <body>
@@ -250,10 +251,205 @@
           </div>
         </div>
       </section>
+      <section
+        id="result-panel"
+        class="panel result-panel"
+        hidden
+        aria-labelledby="result-title"
+      >
+        <div class="section-heading">
+          <div>
+            <p class="step">03 / TU RESULTADO</p>
+            <h2 id="result-title">Así quedó tu pack</h2>
+          </div>
+        </div>
+        <p>
+          Estas son las imágenes exactas del paquete descargable. Toca un
+          sticker para ampliarlo.
+        </p>
+        <p id="result-message" role="status" hidden></p>
+        <button type="button" id="result-retry" class="quiet" hidden>
+          Volver a consultar
+        </button>
+        <div id="result-grid" class="media-grid"></div>
+      </section>
       <footer>
         <span>StickerFast WA</span
         ><span>Hecho para compartir. Creado por ti.</span>
       </footer>
     </main>
+    <dialog
+      id="result-dialog"
+      class="preview-dialog"
+      aria-labelledby="result-dialog-title"
+    >
+      <div class="dialog-heading">
+        <h2 id="result-dialog-title">Vista del sticker</h2>
+        <button type="button" id="close-result" class="quiet">Cerrar</button>
+      </div>
+      <div class="transparency preview-large">
+        <img id="result-image" alt="" />
+      </div>
+      <p id="result-detail"></p>
+    </dialog>
+    <dialog
+      id="image-editor"
+      class="editor-dialog"
+      aria-labelledby="editor-title"
+    >
+      <div class="dialog-heading">
+        <div>
+          <p class="step">TU MESA DE EDICIÓN</p>
+          <h2 id="editor-title">Edita tu sticker</h2>
+        </div>
+        <button type="button" id="editor-close" class="quiet">Cancelar</button>
+      </div>
+      <p class="editor-intro">
+        Recorta, borra y añade tu toque. El original se conserva.
+      </p>
+      <div class="editor-layout">
+        <div class="editor-visual">
+          <div class="transparency editor-stage">
+            <canvas
+              id="editor-canvas"
+              width="512"
+              height="512"
+              aria-label="Lienzo del sticker"
+            ></canvas>
+          </div>
+          <p id="editor-hint" role="status"></p>
+          <p id="editor-error" class="message" role="alert" hidden></p>
+        </div>
+        <div class="editor-controls">
+          <fieldset id="editor-fields">
+            <legend class="sr-only">Herramientas de edición</legend>
+            <div class="editor-tools">
+              <button
+                type="button"
+                class="quiet"
+                data-tool="move"
+                aria-pressed="true"
+              >
+                Mover</button
+              ><button
+                type="button"
+                class="quiet"
+                data-tool="cut"
+                aria-pressed="false"
+              >
+                Recorte libre</button
+              ><button
+                type="button"
+                class="quiet"
+                data-tool="erase"
+                aria-pressed="false"
+              >
+                Borrador
+              </button>
+            </div>
+            <div class="editor-tools">
+              <button type="button" id="editor-rotate" class="quiet">
+                Girar 90°</button
+              ><button type="button" id="editor-flip" class="quiet">
+                Voltear</button
+              ><button type="button" id="editor-circle" class="quiet">
+                Círculo
+              </button>
+            </div>
+            <label class="field"
+              >Zoom<input
+                id="editor-zoom"
+                type="range"
+                min="0.25"
+                max="4"
+                step="0.05"
+                value="1"
+            /></label>
+            <label class="field"
+              >Posición horizontal<input
+                id="editor-x"
+                type="range"
+                min="-512"
+                max="512"
+                step="1"
+                value="0"
+            /></label>
+            <label class="field"
+              >Posición vertical<input
+                id="editor-y"
+                type="range"
+                min="-512"
+                max="512"
+                step="1"
+                value="0"
+            /></label>
+            <label class="field"
+              >Tamaño del borrador<input
+                id="editor-brush"
+                type="range"
+                min="4"
+                max="100"
+                value="30"
+            /></label>
+            <label class="field"
+              >Texto<input
+                id="editor-text"
+                type="text"
+                maxlength="120"
+                placeholder="Añade una frase"
+            /></label>
+            <div class="editor-color-row">
+              <label class="field"
+                >Color del texto<input
+                  id="editor-text-color"
+                  type="color"
+                  value="#ffffff" /></label
+              ><label class="field"
+                >Color del borde<input
+                  id="editor-border-color"
+                  type="color"
+                  value="#ffffff"
+              /></label>
+            </div>
+            <label class="field"
+              >Tamaño del texto<input
+                id="editor-font"
+                type="range"
+                min="16"
+                max="80"
+                value="40"
+            /></label>
+            <label class="field"
+              >Altura del texto<input
+                id="editor-text-y"
+                type="range"
+                min="48"
+                max="464"
+                value="432"
+            /></label>
+            <label class="field"
+              >Grosor del borde<input
+                id="editor-border"
+                type="range"
+                min="0"
+                max="16"
+                value="0"
+            /></label>
+          </fieldset>
+        </div>
+      </div>
+      <div class="editor-footer">
+        <div>
+          <button type="button" id="editor-undo" class="quiet" disabled>
+            Deshacer</button
+          ><button type="button" id="editor-reset" class="quiet">
+            Reiniciar edición
+          </button>
+        </div>
+        <button type="button" id="editor-save" class="button primary">
+          Guardar edición
+        </button>
+      </div>
+    </dialog>
   </body>
 </html>
